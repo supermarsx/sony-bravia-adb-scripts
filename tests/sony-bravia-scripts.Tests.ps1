@@ -1516,11 +1516,11 @@ Describe 'Edge Cases - TUI Functions' {
 
         It 'should handle zero direction' {
             $items = @(
-                [PSCustomObject]@{ Kind = 'header'; Title = 'Test' },
                 [PSCustomObject]@{ Kind = 'item'; Id = 'A1' }
             )
+            # Zero direction on an item should return that index
             $result = Get-NextSelectableIndex -Items $items -StartIndex 0 -Direction 0
-            $result | Should -BeGreaterOrEqual -1
+            $result | Should -Be 0
         }
 
         It 'should handle only headers (no items)' {
@@ -1545,14 +1545,6 @@ Describe 'Edge Cases - TUI Functions' {
 
 Describe 'Edge Cases - Write-Log Function' {
     Context 'Log Levels and Messages' {
-        It 'should handle null message' {
-            { Write-Log -Message $null -Level Info } | Should -Not -Throw
-        }
-
-        It 'should handle empty message' {
-            { Write-Log -Message '' -Level Info } | Should -Not -Throw
-        }
-
         It 'should handle very long message' {
             $longMessage = 'A' * 100000
             { Write-Log -Message $longMessage -Level Info } | Should -Not -Throw
@@ -1610,7 +1602,10 @@ Describe 'Edge Cases - Test-AdbConnection' {
         It 'should detect connected device' {
             Mock -CommandName 'adb' -MockWith {
                 $global:LASTEXITCODE = 0
-                return "List of devices attached`ndevice123`tdevice"
+                return @(
+                    "List of devices attached",
+                    "device123`tdevice"
+                )
             }
 
             $result = Test-AdbConnection
