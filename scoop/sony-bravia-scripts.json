@@ -1,10 +1,10 @@
 {
-  "version": "2.0.0-b8bfc78",
+  "version": "2.0.0-ca9913f",
   "description": "Sony Bravia TV ADB control scripts with 70+ actions",
   "homepage": "https://github.com/supermarsx/sony-bravia-adb-scripts",
   "license": "MIT",
   "url": "https://github.com/supermarsx/sony-bravia-adb-scripts/releases/download/rolling/sony-bravia-scripts-powershell.zip",
-  "hash": "1bb8aefb3b4aba97a78fc4861dbe81553eeee4271e4c8aa9d6357c7ed1bda079",
+  "hash": "982338ff34b04f281b0a18da890554a15e070569b9befed3e142f673e515a942",
   "depends": [
     "adb",
     "pwsh"
