@@ -120,7 +120,7 @@ Describe 'Helper Functions' {
         }
 
         It 'should reject empty strings' {
-            $callCount = 0
+            $script:callCount = 0
             Mock -CommandName 'Read-Host' -MockWith {
                 $script:callCount++
                 if ($script:callCount -eq 1) { return '' }
@@ -163,7 +163,7 @@ Describe 'Helper Functions' {
         }
 
         It 'should retry on invalid input' {
-            $callCount = 0
+            $script:callCount = 0
             Mock -CommandName 'Read-Host' -MockWith {
                 $script:callCount++
                 if ($script:callCount -eq 1) { return 'maybe' }
@@ -204,7 +204,7 @@ Describe 'Invoke-Adb Function' {
     }
 
     It 'should include serial when provided' {
-        $script:Serial = '192.168.1.100:5555'
+        $Serial = '192.168.1.100:5555'
 
         Mock -CommandName 'adb' -MockWith {
             param([Parameter(ValueFromRemainingArguments)]$args)
@@ -245,7 +245,7 @@ Describe 'Menu Structure' {
     Context 'Menu Entries' {
         BeforeAll {
             # Extract menu definition
-            if ($script:ScriptContent -match '(?ms)\$script:Menu\s*=\s*@\((.*?)\)') {
+            if ($script:ScriptContent -match '(?ms)\$script:Menu\s*=\s*@\((.+?)\)\s*\$script:ActionMap') {
                 $menuText = $Matches[1]
                 $script:MenuEntries = [regex]::Matches($menuText, "@\('([^']+)',\s*'([^']+)',\s*'([^']+)'\)")
             }
@@ -257,9 +257,9 @@ Describe 'Menu Structure' {
 
         It 'should have properly formatted entries' {
             foreach ($entry in $script:MenuEntries) {
-                $entry.Groups[1].Value | Should -Match '^[A-Z]\d+$' # ID like A1, B2
+                $entry.Groups[1].Value | Should -Match '^[A-Z]\d+[A-Z]?$' # ID like A1, B2, I2A
                 $entry.Groups[2].Value | Should -Not -BeNullOrEmpty # Label
-                $entry.Groups[3].Value | Should -Match '^[a-z]\d+$' # Function like a1, b2
+                $entry.Groups[3].Value | Should -Match '^[a-z]\d+[a-z]?$' # Function like a1, b2, i3a
             }
         }
 
@@ -352,7 +352,7 @@ Describe 'Action Functions' {
         }
 
         It 'should define all I-series functions (applications)' {
-            'i1', 'i2', 'i3', 'i4', 'i5', 'i6', 'i7', 'i8', 'i9', 'i10', 'i11', 'i12' | ForEach-Object {
+            'i1', 'i2', 'i3', 'i3a', 'i4', 'i5', 'i6', 'i7', 'i8', 'i9', 'i10', 'i11', 'i12', 'i13', 'i14', 'i15', 'i16' | ForEach-Object {
                 $script:ScriptContent | Should -Match "(?m)^function $_ \{"
             }
         }
@@ -502,8 +502,7 @@ Describe 'Get-SectionTitleForId Function' {
 
 Describe 'Script Execution' {
     BeforeAll {
-        Mock -CommandName 'Start-Tui' -MockWith {} -ModuleName 'SonyBraviaScripts'
-        Mock -CommandName 'Invoke-Action' -MockWith { return $true } -ModuleName 'SonyBraviaScripts'
+        # Tests check script text, no mocking needed
     }
 
     It 'should accept -Action parameter' {
@@ -512,9 +511,9 @@ Describe 'Script Execution' {
         $script:ScriptContent | Should -Match 'param\s*\(\s*\[Parameter\(Position\s*=\s*0\)\]\s*\[string\]\$Action'
     }
 
-    It 'should accept -Serial parameter' {
+    It 'script should accept Serial parameter' {
         $script:ScriptContent = Get-Content $script:ScriptPath -Raw
-        $script:ScriptContent | Should -Match '\[string\]\$Serial'
+        $script:ScriptContent | Should -Match 'param[\s\S]{1,2000}?\[string\]\$Serial'
     }
 }
 
@@ -640,18 +639,16 @@ Describe 'Code Quality' {
     }
 
     It 'should not have trailing whitespace' {
-        $lines = Get-Content $script:ScriptPath
-        $trailingWhitespace = $lines | Where-Object { $_ -match '\s+$' }
-        $trailingWhitespace.Count | Should -Be 0
+        $lines = (Get-Content $script:ScriptPath) | Where-Object { $_ -notmatch '\s+$' }
+        $allLines = Get-Content $script:ScriptPath
+        $lines.Count | Should -Be $allLines.Count
     }
 
     It 'should use consistent indentation' {
         # Check that indentation is consistent (spaces, not tabs)
         $lines = Get-Content $script:ScriptPath
-        $tabLines = $lines | Where-Object { $_ -match "`t" }
-        # Allow tabs in here-strings or comments
-        $invalidTabs = $tabLines | Where-Object { $_ -notmatch '^\s*#' -and $_ -notmatch '@"' -and $_ -notmatch '"@' }
-        $invalidTabs.Count | Should -Be 0
+        $tabLines = @($lines | Where-Object { $_ -match "\t" -and $_ -notmatch '^\s*#' -and $_ -notmatch '@"' -and $_ -notmatch '"@' })
+        $tabLines.Count | Should -Be 0
     }
 }
 
@@ -681,7 +678,7 @@ Describe 'Integration Scenarios' {
 Describe 'Additional Helper Functions' {
     Context 'Write-Title' {
         BeforeEach {
-            Mock -CommandName 'Write-Host' -MockWith {} -ModuleName 'SonyBraviaScripts'
+            Mock -CommandName 'Write-Host' -MockWith {}
         }
 
         It 'should exist' {
@@ -706,18 +703,18 @@ Describe 'Additional Helper Functions' {
             $script:ScriptContent | Should -Match '(?m)^function Done \{'
         }
 
-        It 'should call Pause-Continue' {
+        It 'should call Wait-ForContinue' {
             $script:ScriptContent = Get-Content $script:ScriptPath -Raw
             if ($script:ScriptContent -match '(?ms)function Done \{(.*?)(?=^function |\z)') {
-                $Matches[1] | Should -Match 'Pause-Continue'
+                $Matches[1] | Should -Match 'Wait-ForContinue'
             }
         }
     }
 
-    Context 'Pause-Continue' {
+    Context 'Wait-ForContinue' {
         It 'should exist' {
             $script:ScriptContent = Get-Content $script:ScriptPath -Raw
-            $script:ScriptContent | Should -Match '(?m)^function Pause-Continue \{'
+            $script:ScriptContent | Should -Match '(?m)^function Wait-ForContinue \{'
         }
 
         It 'should use ReadKey' {
@@ -729,15 +726,15 @@ Describe 'Additional Helper Functions' {
 
 Describe 'Action Function Behavior' {
     BeforeEach {
-        Mock -CommandName 'Write-Host' -MockWith {} -ModuleName 'SonyBraviaScripts'
-        Mock -CommandName 'Write-Title' -MockWith {} -ModuleName 'SonyBraviaScripts'
-        Mock -CommandName 'Done' -MockWith {} -ModuleName 'SonyBraviaScripts'
+        Mock -CommandName 'Write-Host' -MockWith {}
+        Mock -CommandName 'Write-Title' -MockWith {}
+        Mock -CommandName 'Done' -MockWith {}
         Mock -CommandName 'Invoke-Adb' -MockWith {
             return [pscustomobject]@{ ExitCode = 0; Output = 'success' }
-        } -ModuleName 'SonyBraviaScripts'
-        Mock -CommandName 'Read-NonEmpty' -MockWith { 'test-value' } -ModuleName 'SonyBraviaScripts'
-        Mock -CommandName 'Read-YesNo' -MockWith { $true } -ModuleName 'SonyBraviaScripts'
-        Mock -CommandName 'Read-Host' -MockWith { '' } -ModuleName 'SonyBraviaScripts'
+        }
+        Mock -CommandName 'Read-NonEmpty' -MockWith { 'test-value' }
+        Mock -CommandName 'Read-YesNo' -MockWith { $true }
+        Mock -CommandName 'Read-Host' -MockWith { '' }
     }
 
     Context 'Connection Functions' {
@@ -873,15 +870,15 @@ Describe 'TUI Behavior Functions' {
 
     Context 'Get-NextSelectableIndex Function' {
         It 'should accept Items parameter' {
-            $script:ScriptContent | Should -Match 'function Get-NextSelectableIndex.*Items'
+            $script:ScriptContent | Should -Match 'function Get-NextSelectableIndex[\s\S]*?param[\s\S]*?\$Items'
         }
 
         It 'should accept StartIndex parameter' {
-            $script:ScriptContent | Should -Match 'function Get-NextSelectableIndex.*StartIndex'
+            $script:ScriptContent | Should -Match 'function Get-NextSelectableIndex[\s\S]*?param[\s\S]*?\$StartIndex'
         }
 
         It 'should accept Direction parameter' {
-            $script:ScriptContent | Should -Match 'function Get-NextSelectableIndex.*Direction'
+            $script:ScriptContent | Should -Match 'function Get-NextSelectableIndex[\s\S]*?param[\s\S]*?\$Direction'
         }
 
         It 'should skip header entries' {
@@ -893,11 +890,11 @@ Describe 'TUI Behavior Functions' {
 
     Context 'Invoke-Action Function' {
         It 'should accept Id parameter' {
-            $script:ScriptContent | Should -Match 'function Invoke-Action.*\$Id'
+            $script:ScriptContent | Should -Match 'function Invoke-Action[\s\S]*?param[\s\S]*?\$Id'
         }
 
         It 'should accept Quiet switch' {
-            $script:ScriptContent | Should -Match 'function Invoke-Action.*\[switch\]\$Quiet'
+            $script:ScriptContent | Should -Match 'function Invoke-Action[\s\S]*?param[\s\S]*?\[switch\]\$Quiet'
         }
 
         It 'should handle exit command (x)' {
@@ -1026,7 +1023,7 @@ Describe 'Edge Cases and Error Scenarios' {
 
         It 'script should accept Serial parameter' {
             $script:ScriptContent = Get-Content $script:ScriptPath -Raw
-            $script:ScriptContent | Should -Match 'param\s*\([^\)]*\[string\]\$Serial'
+            $script:ScriptContent | Should -Match 'param[\s\S]{1,2000}?\[string\]\$Serial'
         }
     }
 }
