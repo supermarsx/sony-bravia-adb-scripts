@@ -62,7 +62,7 @@ Compress-Archive -Path @(
     (Join-Path $scriptRoot "sony-bravia-scripts.sh"),
     (Join-Path $scriptRoot "readme.md"),
     (Join-Path $scriptRoot "license.md"),
-    (Join-Path $scriptRoot "PSScriptAnalyzerSettings.psd1"),
+    (Join-Path $scriptRoot "dev\PSScriptAnalyzerSettings.psd1"),
     (Join-Path $scriptRoot ".shellcheckrc"),
     (Join-Path $scriptRoot ".editorconfig"),
     (Join-Path $scriptRoot "tests")

@@ -227,7 +227,7 @@ editorconfig-checker
 
 **Configuration files:**
 - `.editorconfig` - Formatting rules for all file types
-- `PSScriptAnalyzerSettings.psd1` - PowerShell linting rules
+- `dev/PSScriptAnalyzerSettings.psd1` - PowerShell linting rules
 - `.shellcheckrc` - ShellCheck configuration
 
 ### Continuous Integration
@@ -247,7 +247,7 @@ The project uses GitHub Actions for automated testing and linting across multipl
 ```powershell
 # Run all checks locally (PowerShell)
 Invoke-Pester -Path ./tests
-Invoke-ScriptAnalyzer -Path . -Recurse -Settings ./PSScriptAnalyzerSettings.psd1
+Invoke-ScriptAnalyzer -Path . -Recurse -Settings ./dev/PSScriptAnalyzerSettings.psd1
 ```
 
 ```bash
@@ -278,10 +278,16 @@ sony-bravia-adb-scripts/
 │   ├── sony-bravia-scripts.Tests.ps1  # PowerShell unit tests
 │   ├── launcher.bats                  # Shell script tests (Unix)
 │   └── launcher-windows.bats          # Batch file tests (Windows)
+├── dev/
+│   ├── PSScriptAnalyzerSettings.psd1  # PowerShell linting config
+│   ├── format-powershell.ps1          # Format check script
+│   ├── lint-powershell.ps1            # Lint check script
+│   ├── test-powershell.ps1            # Test runner script
+│   ├── package.ps1                    # Package creator
+│   └── run-ci.ps1                     # Full CI pipeline
 ├── .github/
 │   └── workflows/
-│       └── tests.yml                  # CI/CD pipeline
-├── PSScriptAnalyzerSettings.psd1      # PowerShell linting config
+│       └── ci.yml                     # CI/CD pipeline
 ├── .shellcheckrc                      # Shell linting config
 ├── .editorconfig                      # Formatting rules
 ├── readme.md                          # This file

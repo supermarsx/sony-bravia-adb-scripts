@@ -25,7 +25,7 @@ if (-not $module) {
 }
 
 $scriptRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-$settingsPath = Join-Path $scriptRoot "PSScriptAnalyzerSettings.psd1"
+$settingsPath = Join-Path $PSScriptRoot "PSScriptAnalyzerSettings.psd1"
 
 Write-Host "Analyzing PowerShell files..." -ForegroundColor Gray
 Write-Host "Settings: $settingsPath" -ForegroundColor Gray

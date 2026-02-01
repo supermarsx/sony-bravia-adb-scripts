@@ -122,7 +122,7 @@ jobs:
         run: |
           Write-Host "=== Running PSScriptAnalyzer ===" -ForegroundColor Cyan
           
-          $results = Invoke-ScriptAnalyzer -Path . -Recurse -Settings ./PSScriptAnalyzerSettings.psd1 -ReportSummary
+          $results = Invoke-ScriptAnalyzer -Path . -Recurse -Settings ./dev/PSScriptAnalyzerSettings.psd1 -ReportSummary
           
           if ($results) {
             $results | Format-Table -AutoSize
@@ -150,7 +150,7 @@ jobs:
           name: psscriptanalyzer-results
           path: |
             **/*.ps1
-            PSScriptAnalyzerSettings.psd1
+            dev/PSScriptAnalyzerSettings.psd1
 
   lint-shell:
     name: Lint Shell
