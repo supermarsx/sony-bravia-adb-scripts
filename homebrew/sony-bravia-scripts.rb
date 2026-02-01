@@ -2,8 +2,8 @@ class SonyBraviaScripts < Formula
   desc "Sony Bravia TV ADB control scripts with 70+ actions"
   homepage "https://github.com/supermarsx/sony-bravia-adb-scripts"
   url "https://github.com/supermarsx/sony-bravia-adb-scripts/releases/download/rolling/sony-bravia-scripts-unix.zip"
-  version "2.0.0-rolling"
-  sha256 "ROLLING_RELEASE_SHA256"
+  version "2.0.0-b8bfc78"
+  sha256 "238919ce78a5c7eccc54e42cf214e662f6d942fa21c4493c0745d6e2a69c1440"
   license "MIT"
 
   depends_on "powershell"
