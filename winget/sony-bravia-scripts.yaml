@@ -1,5 +1,5 @@
 PackageIdentifier: YourPublisher.SonyBraviaScripts
-PackageVersion: 2.0.0.44
+PackageVersion: 2.0.0.47
 PackageName: Sony Bravia ADB Scripts
 Publisher: Your Name
 License: MIT
@@ -39,7 +39,7 @@ Installers:
   - Architecture: x64
     InstallerType: zip
     InstallerUrl: https://github.com/supermarsx/sony-bravia-adb-scripts/releases/download/rolling/sony-bravia-scripts-powershell.zip
-    InstallerSha256: 982338ff34b04f281b0a18da890554a15e070569b9befed3e142f673e515a942
+    InstallerSha256: 0019dfc4b32d63c1392aa264aed2253c1e0c2fb09216f8e2cc269bbfb8bb49b5
     NestedInstallerType: portable
     NestedInstallerFiles:
       - RelativeFilePath: sony-bravia-scripts.ps1
