@@ -359,4 +359,146 @@ jobs:
           echo "### Package Sizes:" >> $GITHUB_STEP_SUMMARY
           ls -lh dist/ | tail -n +2 | awk '{print "- " $9 ": " $5}' >> $GITHUB_STEP_SUMMARY
 
+  # ============================================================================
+  # ROLLING RELEASE (only on main branch push)
+  # ============================================================================
+
+  rolling-release:
+    name: Rolling Release
+    runs-on: ubuntu-latest
+    needs: [package]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download packages
+        uses: actions/download-artifact@v4
+        with:
+          name: release-packages
+          path: dist
+
+      - name: Generate release info
+        id: release_info
+        run: |
+          # Get short commit hash
+          SHORT_HASH=$(git rev-parse --short HEAD)
+          COMMIT_MSG=$(git log -1 --pretty=format:"%s")
+          COMMIT_AUTHOR=$(git log -1 --pretty=format:"%an")
+          COMMIT_DATE=$(git log -1 --pretty=format:"%ci")
+          
+          echo "short_hash=${SHORT_HASH}" >> $GITHUB_OUTPUT
+          echo "commit_msg=${COMMIT_MSG}" >> $GITHUB_OUTPUT
+          echo "commit_author=${COMMIT_AUTHOR}" >> $GITHUB_OUTPUT
+          echo "commit_date=${COMMIT_DATE}" >> $GITHUB_OUTPUT
+          
+          # Create release notes
+          cat > RELEASE_NOTES.md << EOF
+          # Rolling Release - ${SHORT_HASH}
+          
+          **Automated build from latest commit**
+          
+          ## Commit Information
+          
+          - **Hash:** \`${SHORT_HASH}\` (\`${GITHUB_SHA}\`)
+          - **Message:** ${COMMIT_MSG}
+          - **Author:** ${COMMIT_AUTHOR}
+          - **Date:** ${COMMIT_DATE}
+          - **Branch:** ${GITHUB_REF_NAME}
+          
+          ## 📦 Packages
+          
+          This rolling release includes the latest development build with all CI checks passed.
+          
+          ### Available Downloads:
+          
+          - **sony-bravia-scripts-powershell.zip** - Windows package with .cmd launcher
+          - **sony-bravia-scripts-unix.zip** - macOS/Linux package with .sh launcher
+          - **sony-bravia-scripts-complete.zip** - Complete package with tests and dev tools
+          
+          ### Installation:
+          
+          **Windows:**
+          \`\`\`powershell
+          # Extract sony-bravia-scripts-powershell.zip
+          .\install.ps1
+          \`\`\`
+          
+          **macOS/Linux:**
+          \`\`\`bash
+          # Extract sony-bravia-scripts-unix.zip
+          chmod +x install.sh
+          ./install.sh
+          \`\`\`
+          
+          ## ⚠️ Rolling Release Notice
+          
+          This is an automated rolling release that reflects the latest state of the ${GITHUB_REF_NAME} branch.
+          
+          - ✅ All CI checks have passed
+          - 🔄 Updated automatically on every push
+          - 🧪 May contain experimental features
+          - 📌 For stable releases, use tagged versions
+          
+          ## Changes Since Last Build
+          
+          See commit history: [${SHORT_HASH}](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA})
+          
+          ---
+          
+          **Build:** [#${GITHUB_RUN_NUMBER}](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})  
+          **Built:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+          EOF
+          
+          cat RELEASE_NOTES.md
+
+      - name: Delete existing rolling release
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Delete the rolling tag and release if they exist
+          gh release delete rolling --yes || true
+          git push origin :refs/tags/rolling || true
+
+      - name: Create rolling tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -f rolling
+          git push -f origin rolling
+
+      - name: Create rolling release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create rolling \
+            --title "Rolling Release (${{ steps.release_info.outputs.short_hash }})" \
+            --notes-file RELEASE_NOTES.md \
+            --prerelease \
+            dist/sony-bravia-scripts-powershell.zip \
+            dist/sony-bravia-scripts-unix.zip \
+            dist/sony-bravia-scripts-complete.zip
+
+      - name: Update release summary
+        run: |
+          echo "## 🚀 Rolling Release Published" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Release:** [rolling (${{ steps.release_info.outputs.short_hash }})](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/tag/rolling)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Packages Available:" >> $GITHUB_STEP_SUMMARY
+          echo "- sony-bravia-scripts-powershell.zip" >> $GITHUB_STEP_SUMMARY
+          echo "- sony-bravia-scripts-unix.zip" >> $GITHUB_STEP_SUMMARY
+          echo "- sony-bravia-scripts-complete.zip" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Commit:" >> $GITHUB_STEP_SUMMARY
+          echo "- **Hash:** \`${{ steps.release_info.outputs.short_hash }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Message:** ${{ steps.release_info.outputs.commit_msg }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Author:** ${{ steps.release_info.outputs.commit_author }}" >> $GITHUB_STEP_SUMMARY
+
 
