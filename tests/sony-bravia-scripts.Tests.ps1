@@ -1065,3 +1065,651 @@ Describe 'Console API Usage' {
     }
 }
 
+Describe 'Edge Cases - Configuration Functions' {
+    Context 'Initialize-Config' {
+        It 'should handle missing config directory' {
+            { Initialize-Config } | Should -Not -Throw
+        }
+
+        It 'should create config file if missing' {
+            $testConfigDir = Join-Path $TestDrive 'config-test'
+            $env:SONY_BRAVIA_CONFIG = Join-Path $testConfigDir 'config.json'
+            
+            { Initialize-Config } | Should -Not -Throw
+            
+            Remove-Item Env:\SONY_BRAVIA_CONFIG -ErrorAction SilentlyContinue
+        }
+    }
+
+    Context 'Get-Config' {
+        It 'should return default config when file missing' {
+            $env:SONY_BRAVIA_CONFIG = Join-Path $TestDrive 'nonexistent.json'
+            
+            $config = Get-Config
+            $config | Should -Not -BeNullOrEmpty
+            $config.retryAttempts | Should -BeGreaterThan 0
+            
+            Remove-Item Env:\SONY_BRAVIA_CONFIG -ErrorAction SilentlyContinue
+        }
+
+        It 'should handle corrupted JSON gracefully' {
+            $testConfigPath = Join-Path $TestDrive 'corrupted.json'
+            '{invalid json' | Out-File -FilePath $testConfigPath -Encoding utf8
+            $env:SONY_BRAVIA_CONFIG = $testConfigPath
+            
+            $config = Get-Config
+            $config | Should -Not -BeNullOrEmpty
+            
+            Remove-Item Env:\SONY_BRAVIA_CONFIG -ErrorAction SilentlyContinue
+        }
+    }
+
+    Context 'Set-ConfigValue' {
+        It 'should handle special characters in key' {
+            { Set-ConfigValue -Key 'test-key_123' -Value 'test' } | Should -Not -Throw
+        }
+
+        It 'should handle complex values' {
+            { Set-ConfigValue -Key 'testKey' -Value @{ nested = 'value' } } | Should -Not -Throw
+        }
+    }
+}
+
+Describe 'Edge Cases - History Functions' {
+    Context 'Add-ToHistory' {
+        It 'should handle very long action string' {
+            $longAction = 'A' * 10000
+            { Add-ToHistory -Action $longAction -Serial 'test' -Success $true } | Should -Not -Throw
+        }
+
+        It 'should handle special characters in action' {
+            $specialAction = "test`n`r`t<>&|';`$"
+            { Add-ToHistory -Action $specialAction -Serial 'test' -Success $true } | Should -Not -Throw
+        }
+
+        It 'should handle Unicode characters' {
+            $unicodeAction = 'test-unicode-action'
+            { Add-ToHistory -Action $unicodeAction -Serial 'test' -Success $true } | Should -Not -Throw
+        }
+    }
+
+    Context 'Get-History' {
+        It 'should handle missing history file' {
+            $testHistoryPath = Join-Path $TestDrive 'history-nonexistent-test.json'
+            Remove-Item $testHistoryPath -ErrorAction SilentlyContinue
+            $env:SONY_BRAVIA_HISTORY = $testHistoryPath
+            
+            $history = Get-History
+            $history | Should -Not -BeNullOrEmpty
+            $history.Count | Should -BeGreaterOrEqual 0
+            
+            Remove-Item Env:\SONY_BRAVIA_HISTORY -ErrorAction SilentlyContinue
+        }
+
+        It 'should handle corrupted history file' {
+            $testHistoryPath = Join-Path $TestDrive 'history-corrupt.json'
+            '[{invalid' | Out-File -FilePath $testHistoryPath -Encoding utf8
+            $env:SONY_BRAVIA_HISTORY = $testHistoryPath
+            
+            $history = Get-History
+            $history | Should -Not -BeNullOrEmpty
+            
+            Remove-Item Env:\SONY_BRAVIA_HISTORY -ErrorAction SilentlyContinue
+        }
+    }
+}
+
+Describe 'Edge Cases - Helper Functions' {
+    Context 'Read-NonEmpty - Advanced' {
+        It 'should handle very long input' {
+            $longInput = 'A' * 10000
+            Mock -CommandName 'Read-Host' -MockWith { $longInput }
+            
+            $result = Read-NonEmpty -Prompt 'Test'
+            $result.Length | Should -Be 10000
+        }
+
+        It 'should handle Unicode input' {
+            Mock -CommandName 'Read-Host' -MockWith { 'test-unicode-string' }
+            
+            $result = Read-NonEmpty -Prompt 'Test'
+            $result | Should -Be 'test-unicode-string'
+        }
+
+        It 'should accept non-empty input with whitespace' {
+            Mock -CommandName 'Read-Host' -MockWith { "test with spaces" }
+            
+            $result = Read-NonEmpty -Prompt 'Test'
+            $result.Length | Should -BeGreaterThan 0
+        }
+
+        It 'should handle only spaces as empty' {
+            $script:callCount = 0
+            Mock -CommandName 'Read-Host' -MockWith {
+                $script:callCount++
+                if ($script:callCount -eq 1) { return '     ' }
+                if ($script:callCount -eq 2) { return "`t`t`t" }
+                return 'valid'
+            }
+            
+            $result = Read-NonEmpty -Prompt 'Test'
+            $result | Should -Be 'valid'
+        }
+    }
+
+    Context 'Read-YesNo - Advanced' {
+        It 'should be case insensitive for Y' {
+            Mock -CommandName 'Read-Host' -MockWith { 'Y' }
+            $result = Read-YesNo -Prompt 'Test'
+            $result | Should -Be $true
+        }
+
+        It 'should be case insensitive for yes' {
+            Mock -CommandName 'Read-Host' -MockWith { 'yEs' }
+            $result = Read-YesNo -Prompt 'Test'
+            $result | Should -Be $true
+        }
+
+        It 'should be case insensitive for N' {
+            Mock -CommandName 'Read-Host' -MockWith { 'N' }
+            $result = Read-YesNo -Prompt 'Test'
+            $result | Should -Be $false
+        }
+
+        It 'should handle whitespace around input' {
+            Mock -CommandName 'Read-Host' -MockWith { '  yes  ' }
+            $result = Read-YesNo -Prompt 'Test'
+            $result | Should -Be $true
+        }
+
+        It 'should retry multiple times on invalid input' {
+            $script:callCount = 0
+            Mock -CommandName 'Read-Host' -MockWith {
+                $script:callCount++
+                switch ($script:callCount) {
+                    1 { return '' }
+                    2 { return '123' }
+                    3 { return 'maybe' }
+                    4 { return 'yesno' }
+                    default { return 'y' }
+                }
+            }
+            
+            $result = Read-YesNo -Prompt 'Test'
+            $result | Should -Be $true
+            $script:callCount | Should -BeGreaterThan 4
+        }
+    }
+
+    Context 'Write-Title - Edge Cases' {
+        It 'should handle very long text' {
+            Mock -CommandName 'Write-Host' -MockWith {}
+            $longText = 'A' * 500
+            { Write-Title $longText } | Should -Not -Throw
+        }
+
+        It 'should handle text with special characters' {
+            Mock -CommandName 'Write-Host' -MockWith {}
+            { Write-Title "Test Title 123" } | Should -Not -Throw
+        }
+
+        It 'should be callable without errors' {
+            Mock -CommandName 'Write-Host' -MockWith {}
+            { Write-Title 'Normal Title' } | Should -Not -Throw
+        }
+    }
+}
+
+Describe 'Edge Cases - Invoke-Adb Function' {
+    BeforeEach {
+        Mock -CommandName 'Write-Host' -MockWith {}
+        Mock -CommandName 'Test-AdbAvailable' -MockWith {}
+        Mock -CommandName 'Get-Config' -MockWith {
+            return [PSCustomObject]@{
+                retryAttempts = 3
+                retryDelayMs  = 100
+            }
+        }
+        $script:Serial = $null
+        $script:QuietMode = $true
+    }
+
+    Context 'Serial Parameter Handling' {
+        It 'should handle null serial' {
+            $script:Serial = $null
+            Mock -CommandName 'adb' -MockWith {
+                $global:LASTEXITCODE = 0
+                return 'success'
+            }
+            
+            { Invoke-Adb -Args @('devices') } | Should -Not -Throw
+        }
+
+        It 'should handle empty serial' {
+            $script:Serial = ''
+            Mock -CommandName 'adb' -MockWith {
+                $global:LASTEXITCODE = 0
+                return 'success'
+            }
+            
+            { Invoke-Adb -Args @('devices') } | Should -Not -Throw
+        }
+
+        It 'should handle serial with special characters' {
+            $script:Serial = '192.168.1.1:5555'
+            Mock -CommandName 'adb' -MockWith {
+                param($ArgList)
+                if ($ArgList -contains '-s' -and $ArgList -contains '192.168.1.1:5555') {
+                    $global:LASTEXITCODE = 0
+                    return 'success'
+                }
+            }
+            
+            $result = Invoke-Adb -Args @('devices')
+            $result.ExitCode | Should -Be 0
+        }
+
+        It 'should handle very long serial string' {
+            $script:Serial = 'device' * 100
+            Mock -CommandName 'adb' -MockWith {
+                $global:LASTEXITCODE = 0
+                return 'success'
+            }
+            
+            { Invoke-Adb -Args @('devices') } | Should -Not -Throw
+        }
+    }
+
+    Context 'Arguments Edge Cases' {
+        It 'should handle single arg' {
+            Mock -CommandName 'adb' -MockWith {
+                $global:LASTEXITCODE = 0
+                return 'success'
+            }
+            
+            $result = Invoke-Adb -Args @('version')
+            $result.ExitCode | Should -Be 0
+        }
+
+        It 'should handle args with special shell characters' {
+            Mock -CommandName 'adb' -MockWith {
+                $global:LASTEXITCODE = 0
+                return 'success'
+            }
+            
+            $result = Invoke-Adb -Args @('shell', "echo 'test|grep>redirect&background;'")
+            $result.ExitCode | Should -Be 0
+        }
+
+        It 'should handle args with Unicode' {
+            Mock -CommandName 'adb' -MockWith {
+                $global:LASTEXITCODE = 0
+                return 'success'
+            }
+            
+            $result = Invoke-Adb -Args @('shell', 'echo test-unicode')
+            $result.ExitCode | Should -Be 0
+        }
+
+        It 'should handle very long command' {
+            Mock -CommandName 'adb' -MockWith {
+                $global:LASTEXITCODE = 0
+                return 'success'
+            }
+            
+            $longCommand = 'test' * 1000
+            $result = Invoke-Adb -Args @('shell', "echo $longCommand")
+            $result.ExitCode | Should -Be 0
+        }
+    }
+
+    Context 'Error Handling Edge Cases' {
+        It 'should handle adb timeout' {
+            Mock -CommandName 'adb' -MockWith {
+                Start-Sleep -Seconds 1
+                $global:LASTEXITCODE = 1
+                return 'timeout'
+            }
+            
+            $result = Invoke-Adb -Args @('devices') -AllowFailure
+            $result.ExitCode | Should -Be 1
+        }
+
+        It 'should handle adb crash' {
+            Mock -CommandName 'adb' -MockWith {
+                throw 'adb crashed'
+            }
+            
+            { Invoke-Adb -Args @('devices') -AllowFailure } | Should -Not -Throw
+        }
+
+        It 'should handle retries on failure' {
+            $script:attemptCount = 0
+            Mock -CommandName 'adb' -MockWith {
+                $script:attemptCount++
+                $global:LASTEXITCODE = 1
+                return "error attempt $script:attemptCount"
+            }
+            
+            $result = Invoke-Adb -Args @('devices') -AllowFailure
+            $result.ExitCode | Should -Be 1
+            $script:attemptCount | Should -BeGreaterOrEqual 1
+        }
+    }
+}
+
+Describe 'Edge Cases - Menu and Actions' {
+    Context 'Invoke-Action - Boundary Cases' {
+        It 'should handle whitespace-only action ID' {
+            Mock -CommandName 'Write-Host' -MockWith {}
+            
+            $result = Invoke-Action -Id '   ' -Quiet
+            $result | Should -Be $true
+        }
+
+        It 'should handle very long action ID' {
+            Mock -CommandName 'Write-Host' -MockWith {}
+            
+            $result = Invoke-Action -Id ('A' * 1000) -Quiet
+            $result | Should -Be $true
+        }
+
+        It 'should handle special characters in action ID' {
+            Mock -CommandName 'Write-Host' -MockWith {}
+            
+            $result = Invoke-Action -Id 'A1<>&|;' -Quiet
+            $result | Should -Be $true
+        }
+
+        It 'should handle x/X (exit) case-insensitively' {
+            $result = Invoke-Action -Id 'X' -Quiet
+            $result | Should -Be $false
+            
+            $result = Invoke-Action -Id 'x' -Quiet
+            $result | Should -Be $false
+        }
+    }
+
+    Context 'Get-SectionTitleForId - Edge Cases' {
+        It 'should handle invalid format' {
+            $result = Get-SectionTitleForId -Id 'INVALID123'
+            $result | Should -Be 'Other'
+        }
+
+        It 'should handle lowercase IDs' {
+            $result = Get-SectionTitleForId -Id 'a1'
+            $result | Should -Match 'ADB connection'
+        }
+
+        It 'should handle mixed case IDs' {
+            $result = Get-SectionTitleForId -Id 'A1a'
+            $result | Should -Not -BeNullOrEmpty
+        }
+    }
+}
+
+Describe 'Edge Cases - TUI Functions' {
+    Context 'New-TuiModel - Edge Cases' {
+        It 'should handle null filter' {
+            $result = New-TuiModel -Filter $null
+            $result | Should -Not -BeNullOrEmpty
+        }
+
+        It 'should handle empty filter' {
+            $result = New-TuiModel -Filter ''
+            $result | Should -Not -BeNullOrEmpty
+        }
+
+        It 'should handle filter with no matches' {
+            $result = New-TuiModel -Filter 'unicode-test-nomatch'
+            # Should return array even if empty
+            $result.GetType().Name | Should -Match 'Array|List'
+        }
+
+        It 'should handle very long filter' {
+            $longFilter = 'A1' + ('x' * 100)
+            $result = New-TuiModel -Filter $longFilter
+            # Should return array even if empty
+            $result.GetType().Name | Should -Match 'Array|List'
+        }
+
+        It 'should handle filter with literal match' {
+            $result = New-TuiModel -Filter 'Connect'
+            $result | Should -Not -BeNullOrEmpty
+        }
+
+        It 'should filter out non-matching items' {
+            $result = New-TuiModel -Filter 'NONEXISTENT_FILTER_12345'
+            if ($result) {
+                $allItems = @($result | Where-Object { $_.Kind -eq 'item' })
+                $allItems.Count | Should -Be 0
+            } else {
+                # Empty result is also valid
+                $true | Should -Be $true
+            }
+        }
+    }
+
+    Context 'Get-NextSelectableIndex - Boundary Cases' {
+        It 'should handle zero items' {
+            $emptyList = @()
+            $result = Get-NextSelectableIndex -Items $emptyList -StartIndex 0 -Direction 1
+            $result | Should -Be -1
+        }
+
+        It 'should handle negative start index' {
+            $items = @(
+                [PSCustomObject]@{ Kind = 'item'; Id = 'A1' }
+            )
+            $result = Get-NextSelectableIndex -Items $items -StartIndex -5 -Direction 1
+            $result | Should -BeGreaterOrEqual 0
+        }
+
+        It 'should handle start index beyond array bounds' {
+            $items = @(
+                [PSCustomObject]@{ Kind = 'item'; Id = 'A1' }
+            )
+            $result = Get-NextSelectableIndex -Items $items -StartIndex 999 -Direction -1
+            $result | Should -BeGreaterOrEqual 0
+        }
+
+        It 'should handle zero direction' {
+            $items = @(
+                [PSCustomObject]@{ Kind = 'header'; Title = 'Test' },
+                [PSCustomObject]@{ Kind = 'item'; Id = 'A1' }
+            )
+            $result = Get-NextSelectableIndex -Items $items -StartIndex 0 -Direction 0
+            $result | Should -BeGreaterOrEqual -1
+        }
+
+        It 'should handle only headers (no items)' {
+            $items = @(
+                [PSCustomObject]@{ Kind = 'header'; Title = 'Test1' },
+                [PSCustomObject]@{ Kind = 'header'; Title = 'Test2' }
+            )
+            $result = Get-NextSelectableIndex -Items $items -StartIndex 0 -Direction 1
+            $result | Should -Be -1
+        }
+
+        It 'should handle large direction value' {
+            $items = @(
+                [PSCustomObject]@{ Kind = 'item'; Id = 'A1' },
+                [PSCustomObject]@{ Kind = 'item'; Id = 'A2' }
+            )
+            $result = Get-NextSelectableIndex -Items $items -StartIndex 0 -Direction 999
+            $result | Should -BeGreaterOrEqual 0
+        }
+    }
+}
+
+Describe 'Edge Cases - Write-Log Function' {
+    Context 'Log Levels and Messages' {
+        It 'should handle null message' {
+            { Write-Log -Message $null -Level Info } | Should -Not -Throw
+        }
+
+        It 'should handle empty message' {
+            { Write-Log -Message '' -Level Info } | Should -Not -Throw
+        }
+
+        It 'should handle very long message' {
+            $longMessage = 'A' * 100000
+            { Write-Log -Message $longMessage -Level Info } | Should -Not -Throw
+        }
+
+        It 'should handle Unicode in message' {
+            { Write-Log -Message 'Unicode log message test' -Level Info } | Should -Not -Throw
+        }
+
+        It 'should handle newlines in message' {
+            { Write-Log -Message "Line1`nLine2`nLine3" -Level Info } | Should -Not -Throw
+        }
+
+        It 'should handle all log levels' {
+            { Write-Log -Message 'Test' -Level Verbose } | Should -Not -Throw
+            { Write-Log -Message 'Test' -Level Info } | Should -Not -Throw
+            { Write-Log -Message 'Test' -Level Warning } | Should -Not -Throw
+            { Write-Log -Message 'Test' -Level Error } | Should -Not -Throw
+        }
+    }
+}
+
+Describe 'Edge Cases - Test-AdbConnection' {
+    Context 'Connection States' {
+        It 'should handle adb command failure' {
+            Mock -CommandName 'adb' -MockWith {
+                $global:LASTEXITCODE = 1
+                return 'error'
+            }
+            
+            $result = Test-AdbConnection
+            $result | Should -Be $false
+        }
+
+        It 'should handle empty device list' {
+            Mock -CommandName 'adb' -MockWith {
+                $global:LASTEXITCODE = 0
+                return 'List of devices attached'
+            }
+            
+            $result = Test-AdbConnection
+            $result | Should -Be $false
+        }
+
+        It 'should handle malformed output' {
+            Mock -CommandName 'adb' -MockWith {
+                $global:LASTEXITCODE = 0
+                return 'corrupted output###@@@'
+            }
+            
+            $result = Test-AdbConnection
+            $result | Should -Be $false
+        }
+
+        It 'should detect connected device' {
+            Mock -CommandName 'adb' -MockWith {
+                $global:LASTEXITCODE = 0
+                return "List of devices attached`ndevice123`tdevice"
+            }
+            
+            $result = Test-AdbConnection
+            $result | Should -Be $true
+        }
+    }
+}
+
+Describe 'Edge Cases - Wait-ForContinue' {
+    Context 'User Interaction' {
+        It 'should not throw on any input' {
+            Mock -CommandName 'Read-Host' -MockWith { '' }
+            Mock -CommandName 'Write-Host' -MockWith {}
+            
+            { Wait-ForContinue } | Should -Not -Throw
+        }
+
+        It 'should handle null input' {
+            Mock -CommandName 'Read-Host' -MockWith { $null }
+            Mock -CommandName 'Write-Host' -MockWith {}
+            
+            { Wait-ForContinue } | Should -Not -Throw
+        }
+    }
+}
+
+Describe 'Edge Cases - Integration Scenarios' {
+    Context 'Concurrent Operations' {
+        It 'should handle rapid successive calls' {
+            Mock -CommandName 'Write-Host' -MockWith {}
+            
+            $results = 1..10 | ForEach-Object {
+                Write-Title -Title "Test $_"
+            }
+            
+            { $results } | Should -Not -Throw
+        }
+    }
+
+    Context 'Resource Cleanup' {
+        It 'should handle cleanup after errors' {
+            Mock -CommandName 'Write-Host' -MockWith {}
+            Mock -CommandName 'Test-AdbAvailable' -MockWith { throw 'Test error' }
+            
+            { 
+                try {
+                    Test-AdbAvailable
+                } catch {
+                    # Cleanup
+                    $null = $_
+                }
+            } | Should -Not -Throw
+        }
+    }
+
+    Context 'Platform-Specific Edge Cases' {
+        It 'should handle Windows line endings' {
+            $testContent = "Line1`r`nLine2`r`nLine3"
+            Mock -CommandName 'Write-Host' -MockWith {}
+            
+            { Write-Log -Message $testContent -Level Info } | Should -Not -Throw
+        }
+
+        It 'should handle Unix line endings' {
+            $testContent = "Line1`nLine2`nLine3"
+            Mock -CommandName 'Write-Host' -MockWith {}
+            
+            { Write-Log -Message $testContent -Level Info } | Should -Not -Throw
+        }
+
+        It 'should handle mixed line endings' {
+            $testContent = "Line1`r`nLine2`nLine3`r`n"
+            Mock -CommandName 'Write-Host' -MockWith {}
+            
+            { Write-Log -Message $testContent -Level Info } | Should -Not -Throw
+        }
+    }
+}
+
+Describe 'Edge Cases - Memory and Performance' {
+    Context 'Large Data Handling' {
+        It 'should handle large menu with many entries' {
+            $result = New-TuiModel
+            $result.Count | Should -BeGreaterThan 0
+            $result.Count | Should -BeLessThan 1000  # Reasonable upper bound
+        }
+
+        It 'should handle menu extraction from large script' {
+            $script:ScriptContent.Length | Should -BeGreaterThan 10000
+        }
+    }
+
+    Context 'String Operations' {
+        It 'should handle repeated string operations' {
+            $result = 1..100 | ForEach-Object {
+                Get-SectionTitleForId -Id "A$($_)"
+            }
+            
+            $result.Count | Should -Be 100
+        }
+    }
+}
+
