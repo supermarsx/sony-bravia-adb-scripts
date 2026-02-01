@@ -165,6 +165,10 @@ jobs:
   test-powershell:
     name: Test PowerShell
     runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: write
     strategy:
       fail-fast: false
       matrix:
