@@ -197,7 +197,7 @@ Describe 'Invoke-Adb Function' {
         }
 
         $result = Invoke-Adb -Args @('devices')
-        
+
         Should -Invoke -CommandName 'Test-AdbAvailable' -Times 1
         Should -Invoke -CommandName 'adb' -Times 1
         $result.Success | Should -Be $true
@@ -1074,9 +1074,9 @@ Describe 'Edge Cases - Configuration Functions' {
         It 'should create config file if missing' {
             $testConfigDir = Join-Path $TestDrive 'config-test'
             $env:SONY_BRAVIA_CONFIG = Join-Path $testConfigDir 'config.json'
-            
+
             { Initialize-Config } | Should -Not -Throw
-            
+
             Remove-Item Env:\SONY_BRAVIA_CONFIG -ErrorAction SilentlyContinue
         }
     }
@@ -1084,11 +1084,11 @@ Describe 'Edge Cases - Configuration Functions' {
     Context 'Get-Config' {
         It 'should return default config when file missing' {
             $env:SONY_BRAVIA_CONFIG = Join-Path $TestDrive 'nonexistent.json'
-            
+
             $config = Get-Config
             $config | Should -Not -BeNullOrEmpty
             $config.retryAttempts | Should -BeGreaterThan 0
-            
+
             Remove-Item Env:\SONY_BRAVIA_CONFIG -ErrorAction SilentlyContinue
         }
 
@@ -1096,10 +1096,10 @@ Describe 'Edge Cases - Configuration Functions' {
             $testConfigPath = Join-Path $TestDrive 'corrupted.json'
             '{invalid json' | Out-File -FilePath $testConfigPath -Encoding utf8
             $env:SONY_BRAVIA_CONFIG = $testConfigPath
-            
+
             $config = Get-Config
             $config | Should -Not -BeNullOrEmpty
-            
+
             Remove-Item Env:\SONY_BRAVIA_CONFIG -ErrorAction SilentlyContinue
         }
     }
@@ -1138,11 +1138,11 @@ Describe 'Edge Cases - History Functions' {
             $testHistoryPath = Join-Path $TestDrive 'history-nonexistent-test.json'
             Remove-Item $testHistoryPath -ErrorAction SilentlyContinue
             $env:SONY_BRAVIA_HISTORY = $testHistoryPath
-            
+
             $history = Get-History
             $history | Should -Not -BeNullOrEmpty
             $history.Count | Should -BeGreaterOrEqual 0
-            
+
             Remove-Item Env:\SONY_BRAVIA_HISTORY -ErrorAction SilentlyContinue
         }
 
@@ -1150,10 +1150,10 @@ Describe 'Edge Cases - History Functions' {
             $testHistoryPath = Join-Path $TestDrive 'history-corrupt.json'
             '[{invalid' | Out-File -FilePath $testHistoryPath -Encoding utf8
             $env:SONY_BRAVIA_HISTORY = $testHistoryPath
-            
+
             $history = Get-History
             $history | Should -Not -BeNullOrEmpty
-            
+
             Remove-Item Env:\SONY_BRAVIA_HISTORY -ErrorAction SilentlyContinue
         }
     }
@@ -1164,21 +1164,21 @@ Describe 'Edge Cases - Helper Functions' {
         It 'should handle very long input' {
             $longInput = 'A' * 10000
             Mock -CommandName 'Read-Host' -MockWith { $longInput }
-            
+
             $result = Read-NonEmpty -Prompt 'Test'
             $result.Length | Should -Be 10000
         }
 
         It 'should handle Unicode input' {
             Mock -CommandName 'Read-Host' -MockWith { 'test-unicode-string' }
-            
+
             $result = Read-NonEmpty -Prompt 'Test'
             $result | Should -Be 'test-unicode-string'
         }
 
         It 'should accept non-empty input with whitespace' {
             Mock -CommandName 'Read-Host' -MockWith { "test with spaces" }
-            
+
             $result = Read-NonEmpty -Prompt 'Test'
             $result.Length | Should -BeGreaterThan 0
         }
@@ -1191,7 +1191,7 @@ Describe 'Edge Cases - Helper Functions' {
                 if ($script:callCount -eq 2) { return "`t`t`t" }
                 return 'valid'
             }
-            
+
             $result = Read-NonEmpty -Prompt 'Test'
             $result | Should -Be 'valid'
         }
@@ -1234,7 +1234,7 @@ Describe 'Edge Cases - Helper Functions' {
                     default { return 'y' }
                 }
             }
-            
+
             $result = Read-YesNo -Prompt 'Test'
             $result | Should -Be $true
             $script:callCount | Should -BeGreaterThan 4
@@ -1281,7 +1281,7 @@ Describe 'Edge Cases - Invoke-Adb Function' {
                 $global:LASTEXITCODE = 0
                 return 'success'
             }
-            
+
             { Invoke-Adb -Args @('devices') } | Should -Not -Throw
         }
 
@@ -1291,7 +1291,7 @@ Describe 'Edge Cases - Invoke-Adb Function' {
                 $global:LASTEXITCODE = 0
                 return 'success'
             }
-            
+
             { Invoke-Adb -Args @('devices') } | Should -Not -Throw
         }
 
@@ -1304,7 +1304,7 @@ Describe 'Edge Cases - Invoke-Adb Function' {
                     return 'success'
                 }
             }
-            
+
             $result = Invoke-Adb -Args @('devices')
             $result.ExitCode | Should -Be 0
         }
@@ -1315,7 +1315,7 @@ Describe 'Edge Cases - Invoke-Adb Function' {
                 $global:LASTEXITCODE = 0
                 return 'success'
             }
-            
+
             { Invoke-Adb -Args @('devices') } | Should -Not -Throw
         }
     }
@@ -1326,7 +1326,7 @@ Describe 'Edge Cases - Invoke-Adb Function' {
                 $global:LASTEXITCODE = 0
                 return 'success'
             }
-            
+
             $result = Invoke-Adb -Args @('version')
             $result.ExitCode | Should -Be 0
         }
@@ -1336,7 +1336,7 @@ Describe 'Edge Cases - Invoke-Adb Function' {
                 $global:LASTEXITCODE = 0
                 return 'success'
             }
-            
+
             $result = Invoke-Adb -Args @('shell', "echo 'test|grep>redirect&background;'")
             $result.ExitCode | Should -Be 0
         }
@@ -1346,7 +1346,7 @@ Describe 'Edge Cases - Invoke-Adb Function' {
                 $global:LASTEXITCODE = 0
                 return 'success'
             }
-            
+
             $result = Invoke-Adb -Args @('shell', 'echo test-unicode')
             $result.ExitCode | Should -Be 0
         }
@@ -1356,7 +1356,7 @@ Describe 'Edge Cases - Invoke-Adb Function' {
                 $global:LASTEXITCODE = 0
                 return 'success'
             }
-            
+
             $longCommand = 'test' * 1000
             $result = Invoke-Adb -Args @('shell', "echo $longCommand")
             $result.ExitCode | Should -Be 0
@@ -1370,7 +1370,7 @@ Describe 'Edge Cases - Invoke-Adb Function' {
                 $global:LASTEXITCODE = 1
                 return 'timeout'
             }
-            
+
             $result = Invoke-Adb -Args @('devices') -AllowFailure
             $result.ExitCode | Should -Be 1
         }
@@ -1379,7 +1379,7 @@ Describe 'Edge Cases - Invoke-Adb Function' {
             Mock -CommandName 'adb' -MockWith {
                 throw 'adb crashed'
             }
-            
+
             { Invoke-Adb -Args @('devices') -AllowFailure } | Should -Not -Throw
         }
 
@@ -1390,7 +1390,7 @@ Describe 'Edge Cases - Invoke-Adb Function' {
                 $global:LASTEXITCODE = 1
                 return "error attempt $script:attemptCount"
             }
-            
+
             $result = Invoke-Adb -Args @('devices') -AllowFailure
             $result.ExitCode | Should -Be 1
             $script:attemptCount | Should -BeGreaterOrEqual 1
@@ -1402,21 +1402,21 @@ Describe 'Edge Cases - Menu and Actions' {
     Context 'Invoke-Action - Boundary Cases' {
         It 'should handle whitespace-only action ID' {
             Mock -CommandName 'Write-Host' -MockWith {}
-            
+
             $result = Invoke-Action -Id '   ' -Quiet
             $result | Should -Be $true
         }
 
         It 'should handle very long action ID' {
             Mock -CommandName 'Write-Host' -MockWith {}
-            
+
             $result = Invoke-Action -Id ('A' * 1000) -Quiet
             $result | Should -Be $true
         }
 
         It 'should handle special characters in action ID' {
             Mock -CommandName 'Write-Host' -MockWith {}
-            
+
             $result = Invoke-Action -Id 'A1<>&|;' -Quiet
             $result | Should -Be $true
         }
@@ -1424,7 +1424,7 @@ Describe 'Edge Cases - Menu and Actions' {
         It 'should handle x/X (exit) case-insensitively' {
             $result = Invoke-Action -Id 'X' -Quiet
             $result | Should -Be $false
-            
+
             $result = Invoke-Action -Id 'x' -Quiet
             $result | Should -Be $false
         }
@@ -1483,7 +1483,8 @@ Describe 'Edge Cases - TUI Functions' {
             if ($result) {
                 $allItems = @($result | Where-Object { $_.Kind -eq 'item' })
                 $allItems.Count | Should -Be 0
-            } else {
+            }
+            else {
                 # Empty result is also valid
                 $true | Should -Be $true
             }
@@ -1581,7 +1582,7 @@ Describe 'Edge Cases - Test-AdbConnection' {
                 $global:LASTEXITCODE = 1
                 return 'error'
             }
-            
+
             $result = Test-AdbConnection
             $result | Should -Be $false
         }
@@ -1591,7 +1592,7 @@ Describe 'Edge Cases - Test-AdbConnection' {
                 $global:LASTEXITCODE = 0
                 return 'List of devices attached'
             }
-            
+
             $result = Test-AdbConnection
             $result | Should -Be $false
         }
@@ -1601,7 +1602,7 @@ Describe 'Edge Cases - Test-AdbConnection' {
                 $global:LASTEXITCODE = 0
                 return 'corrupted output###@@@'
             }
-            
+
             $result = Test-AdbConnection
             $result | Should -Be $false
         }
@@ -1611,7 +1612,7 @@ Describe 'Edge Cases - Test-AdbConnection' {
                 $global:LASTEXITCODE = 0
                 return "List of devices attached`ndevice123`tdevice"
             }
-            
+
             $result = Test-AdbConnection
             $result | Should -Be $true
         }
@@ -1623,7 +1624,7 @@ Describe 'Edge Cases - Wait-ForContinue' {
         Mock -CommandName 'Read-Host' -MockWith { 'continue' }
         Mock -CommandName 'Write-Host' -MockWith {}
     }
-    
+
     Context 'User Interaction' {
         It 'should not throw on any input' {
             { Wait-ForContinue } | Should -Not -Throw
@@ -1640,11 +1641,11 @@ Describe 'Edge Cases - Integration Scenarios' {
     Context 'Concurrent Operations' {
         It 'should handle rapid successive calls' {
             Mock -CommandName 'Write-Host' -MockWith {}
-            
+
             $results = 1..10 | ForEach-Object {
                 Write-Title -Text "Test $_"
             }
-            
+
             { $results } | Should -Not -Throw
         }
     }
@@ -1653,11 +1654,12 @@ Describe 'Edge Cases - Integration Scenarios' {
         It 'should handle cleanup after errors' {
             Mock -CommandName 'Write-Host' -MockWith {}
             Mock -CommandName 'Test-AdbAvailable' -MockWith { throw 'Test error' }
-            
-            { 
+
+            {
                 try {
                     Test-AdbAvailable
-                } catch {
+                }
+                catch {
                     # Cleanup
                     $null = $_
                 }
@@ -1669,21 +1671,21 @@ Describe 'Edge Cases - Integration Scenarios' {
         It 'should handle Windows line endings' {
             $testContent = "Line1`r`nLine2`r`nLine3"
             Mock -CommandName 'Write-Host' -MockWith {}
-            
+
             { Write-Log -Message $testContent -Level Info } | Should -Not -Throw
         }
 
         It 'should handle Unix line endings' {
             $testContent = "Line1`nLine2`nLine3"
             Mock -CommandName 'Write-Host' -MockWith {}
-            
+
             { Write-Log -Message $testContent -Level Info } | Should -Not -Throw
         }
 
         It 'should handle mixed line endings' {
             $testContent = "Line1`r`nLine2`nLine3`r`n"
             Mock -CommandName 'Write-Host' -MockWith {}
-            
+
             { Write-Log -Message $testContent -Level Info } | Should -Not -Throw
         }
     }
@@ -1707,7 +1709,7 @@ Describe 'Edge Cases - Memory and Performance' {
             $result = 1..100 | ForEach-Object {
                 Get-SectionTitleForId -Id "A$($_)"
             }
-            
+
             $result.Count | Should -Be 100
         }
     }
