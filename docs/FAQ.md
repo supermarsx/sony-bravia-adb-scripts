@@ -375,7 +375,7 @@ Check the [license](../license.md). Typically MIT or similar permissive license 
 
 ### How do I report bugs?
 
-1. Check [existing issues](https://github.com/yourusername/sony-bravia-adb-scripts/issues)
+1. Check [existing issues](https://github.com/supermarsx/sony-bravia-adb-scripts/issues)
 2. Gather debug information:
    ```bash
    adb version
@@ -503,5 +503,5 @@ This script provides a convenient middle ground with automation and scripting ca
 **Still have questions?**
 - Check [Troubleshooting Guide](TROUBLESHOOTING.md)
 - Review [Recipes](RECIPES.md) for examples
-- Search [GitHub Issues](https://github.com/yourusername/sony-bravia-adb-scripts/issues)
+- Search [GitHub Issues](https://github.com/supermarsx/sony-bravia-adb-scripts/issues)
 - Create new issue if problem persists

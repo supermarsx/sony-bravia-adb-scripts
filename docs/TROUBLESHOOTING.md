@@ -565,7 +565,7 @@ adb connect <tv-ip>:5555
 If you're still experiencing issues:
 
 1. **Check FAQ**: See [FAQ.md](FAQ.md) for common questions
-2. **Search issues**: Check [GitHub Issues](https://github.com/yourusername/sony-bravia-adb-scripts/issues)
+2. **Search issues**: Check [GitHub Issues](https://github.com/supermarsx/sony-bravia-adb-scripts/issues)
 3. **Collect debug info**:
    ```bash
    # ADB version

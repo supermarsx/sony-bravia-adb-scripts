@@ -1,9 +1,9 @@
 {
     "version": "2.0.0-rolling",
     "description": "Sony Bravia TV ADB control scripts with 70+ actions",
-    "homepage": "https://github.com/yourusername/sony-bravia-adb-scripts",
+    "homepage": "https://github.com/supermarsx/sony-bravia-adb-scripts",
     "license": "MIT",
-    "url": "https://github.com/yourusername/sony-bravia-adb-scripts/releases/download/rolling/sony-bravia-scripts-powershell.zip",
+    "url": "https://github.com/supermarsx/sony-bravia-adb-scripts/releases/download/rolling/sony-bravia-scripts-powershell.zip",
     "hash": "ROLLING_RELEASE_SHA256",
     "depends": [
         "adb",
@@ -37,12 +37,12 @@
         "Write-Host 'Documentation: $dir\\readme.md'"
     ],
     "checkver": {
-        "url": "https://api.github.com/repos/yourusername/sony-bravia-adb-scripts/releases/tags/rolling",
+        "url": "https://api.github.com/repos/supermarsx/sony-bravia-adb-scripts/releases/tags/rolling",
         "jsonpath": "$.name",
         "regex": "Rolling Release \\(([a-f0-9]+)\\)",
         "replace": "2.0.0-${1}"
     },
     "autoupdate": {
-        "url": "https://github.com/yourusername/sony-bravia-adb-scripts/releases/download/rolling/sony-bravia-scripts-powershell.zip"
+        "url": "https://github.com/supermarsx/sony-bravia-adb-scripts/releases/download/rolling/sony-bravia-scripts-powershell.zip"
     }
 }

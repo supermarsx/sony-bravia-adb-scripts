@@ -8,7 +8,7 @@ This directory contains the Scoop manifest for Sony Bravia ADB Scripts.
 
 ```powershell
 # Add bucket
-scoop bucket add sony-bravia https://github.com/yourusername/scoop-sony-bravia
+scoop bucket add sony-bravia https://github.com/supermarsx/scoop-sony-bravia
 
 # Install
 scoop install sony-bravia-scripts
@@ -17,7 +17,7 @@ scoop install sony-bravia-scripts
 ### Option 2: Install directly from URL
 
 ```powershell
-scoop install https://raw.githubusercontent.com/yourusername/sony-bravia-adb-scripts/main/scoop/sony-bravia-scripts.json
+scoop install https://raw.githubusercontent.com/supermarsx/sony-bravia-adb-scripts/main/scoop/sony-bravia-scripts.json
 ```
 
 ### Option 3: Install from local manifest
