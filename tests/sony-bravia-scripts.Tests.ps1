@@ -1642,7 +1642,7 @@ Describe 'Edge Cases - Integration Scenarios' {
             Mock -CommandName 'Write-Host' -MockWith {}
             
             $results = 1..10 | ForEach-Object {
-                Write-Title -Title "Test $_"
+                Write-Title -Text "Test $_"
             }
             
             { $results } | Should -Not -Throw
