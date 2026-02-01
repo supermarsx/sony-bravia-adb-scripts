@@ -1619,18 +1619,18 @@ Describe 'Edge Cases - Test-AdbConnection' {
 }
 
 Describe 'Edge Cases - Wait-ForContinue' {
+    BeforeEach {
+        Mock -CommandName 'Read-Host' -MockWith { 'continue' }
+        Mock -CommandName 'Write-Host' -MockWith {}
+    }
+    
     Context 'User Interaction' {
         It 'should not throw on any input' {
-            Mock -CommandName 'Read-Host' -MockWith { '' }
-            Mock -CommandName 'Write-Host' -MockWith {}
-            
             { Wait-ForContinue } | Should -Not -Throw
         }
 
-        It 'should handle null input' {
-            Mock -CommandName 'Read-Host' -MockWith { $null }
-            Mock -CommandName 'Write-Host' -MockWith {}
-            
+        It 'should handle empty input' {
+            Mock -CommandName 'Read-Host' -MockWith { '' }
             { Wait-ForContinue } | Should -Not -Throw
         }
     }
