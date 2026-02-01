@@ -165,6 +165,7 @@ jobs:
   test-powershell:
     name: Test PowerShell
     runs-on: ${{ matrix.os }}
+    needs: [format-powershell, format-shell, lint-powershell, lint-shell]
     permissions:
       contents: read
       checks: write
@@ -216,6 +217,7 @@ jobs:
   test-shell:
     name: Test Shell
     runs-on: ${{ matrix.os }}
+    needs: [format-powershell, format-shell, lint-powershell, lint-shell]
     strategy:
       fail-fast: false
       matrix:
