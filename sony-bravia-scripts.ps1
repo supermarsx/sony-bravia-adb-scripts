@@ -80,7 +80,8 @@ $script:OutputFormat = $OutputFormat
 $script:VerboseLogging = $VerbosePreference -eq 'Continue'
 
 # Configuration and history paths
-$script:ConfigDir = Join-Path $env:USERPROFILE '.sony-bravia-scripts'
+$homeDir = if ($IsWindows -or $PSVersionTable.PSVersion.Major -le 5) { $env:USERPROFILE } else { $env:HOME }
+$script:ConfigDir = Join-Path $homeDir '.sony-bravia-scripts'
 $script:ConfigFile = Join-Path $script:ConfigDir 'config.json'
 $script:HistoryFile = Join-Path $script:ConfigDir 'history.json'
 $script:MaxHistoryItems = 100
