@@ -1,4 +1,4 @@
-name: Tests
+name: CI
 
 on:
   push:
@@ -8,33 +8,203 @@ on:
   workflow_dispatch:
 
 jobs:
-  powershell-tests:
-    name: PowerShell Tests
+  # ============================================================================
+  # FORMAT CHECKS (run in parallel)
+  # ============================================================================
+  
+  format-powershell:
+    name: Format PowerShell
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check PowerShell file formatting
+        shell: pwsh
+        run: |
+          Write-Host "=== Checking PowerShell formatting ===" -ForegroundColor Cyan
+          
+          $issues = @()
+          
+          # Check for trailing whitespace
+          $psFiles = Get-ChildItem -Path . -Filter "*.ps1" -Recurse
+          foreach ($file in $psFiles) {
+            $lines = Get-Content $file.FullName
+            for ($i = 0; $i -lt $lines.Count; $i++) {
+              if ($lines[$i] -match '\s+$') {
+                $issues += "Trailing whitespace in $($file.Name):$($i+1)"
+              }
+            }
+          }
+          
+          # Check for tabs (should use spaces)
+          foreach ($file in $psFiles) {
+            $content = Get-Content $file.FullName -Raw
+            if ($content -match "`t") {
+              $issues += "Tab character found in $($file.Name) (use spaces)"
+            }
+          }
+          
+          if ($issues.Count -gt 0) {
+            $issues | ForEach-Object { Write-Host "✗ $_" -ForegroundColor Red }
+            exit 1
+          }
+          
+          Write-Host "✓ PowerShell formatting looks good" -ForegroundColor Green
+
+      - name: Check EditorConfig compliance
+        uses: editorconfig-checker/action-editorconfig-checker@main
+        with:
+          version: '2.7.0'
+
+  format-shell:
+    name: Format Shell
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check shell script formatting
+        run: |
+          echo "=== Checking shell script formatting ==="
+          
+          # Check for CRLF line endings (should be LF only)
+          if file *.sh 2>/dev/null | grep -q CRLF; then
+            echo "✗ Error: CRLF line endings detected in shell scripts"
+            exit 1
+          fi
+          
+          # Check for trailing whitespace
+          if grep -n '[[:blank:]]$' *.sh 2>/dev/null; then
+            echo "✗ Trailing whitespace found in shell scripts"
+            exit 1
+          fi
+          
+          # Check for executable bit
+          if [ ! -x sony-bravia-scripts.sh ]; then
+            echo "⚠ Warning: sony-bravia-scripts.sh should be executable"
+          fi
+          
+          echo "✓ Shell script formatting looks good"
+
+      - name: Check batch file line endings
+        run: |
+          echo "=== Checking Windows batch file line endings ==="
+          
+          # Windows scripts should have CRLF
+          if ! file *.cmd 2>/dev/null | grep -q CRLF; then
+            echo "⚠ Warning: Windows batch files should have CRLF line endings"
+          else
+            echo "✓ Batch file line endings look good"
+          fi
+
+  # ============================================================================
+  # LINT CHECKS (run in parallel)
+  # ============================================================================
+
+  lint-powershell:
+    name: Lint PowerShell
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install PSScriptAnalyzer
+        shell: pwsh
+        run: |
+          Install-Module -Name PSScriptAnalyzer -Force -SkipPublisherCheck -Scope CurrentUser
+
+      - name: Run PSScriptAnalyzer
+        shell: pwsh
+        run: |
+          Write-Host "=== Running PSScriptAnalyzer ===" -ForegroundColor Cyan
+          
+          $results = Invoke-ScriptAnalyzer -Path . -Recurse -Settings ./PSScriptAnalyzerSettings.psd1 -ReportSummary
+          
+          if ($results) {
+            $results | Format-Table -AutoSize
+            $errorCount = ($results | Where-Object { $_.Severity -eq 'Error' }).Count
+            $warningCount = ($results | Where-Object { $_.Severity -eq 'Warning' }).Count
+            
+            Write-Host "`n=== Summary ===" -ForegroundColor Cyan
+            Write-Host "Errors: $errorCount" -ForegroundColor $(if ($errorCount -gt 0) { 'Red' } else { 'Green' })
+            Write-Host "Warnings: $warningCount" -ForegroundColor $(if ($warningCount -gt 0) { 'Yellow' } else { 'Green' })
+            
+            if ($errorCount -gt 0) {
+              Write-Error "PSScriptAnalyzer found $errorCount error(s)"
+              exit 1
+            } elseif ($warningCount -gt 0) {
+              Write-Warning "PSScriptAnalyzer found $warningCount warning(s)"
+            }
+          } else {
+            Write-Host "✓ No issues found by PSScriptAnalyzer" -ForegroundColor Green
+          }
+
+      - name: Upload analysis results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: psscriptanalyzer-results
+          path: |
+            **/*.ps1
+            PSScriptAnalyzerSettings.psd1
+
+  lint-shell:
+    name: Lint Shell
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install shellcheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+
+      - name: Run shellcheck
+        run: |
+          echo "=== Running ShellCheck ===" 
+          
+          EXIT_CODE=0
+          shellcheck -x sony-bravia-scripts.sh || EXIT_CODE=$?
+          
+          if [ "${EXIT_CODE}" -eq 0 ]; then
+            echo "✓ No issues found by ShellCheck"
+          else
+            echo "✗ ShellCheck found issues"
+            exit 1
+          fi
+
+  # ============================================================================
+  # TEST SCRIPTS (run in parallel)
+  # ============================================================================
+
+  test-powershell:
+    name: Test PowerShell
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        include:
-          - os: ubuntu-latest
-            shell: pwsh
-          - os: windows-latest
-            shell: pwsh
-          - os: macos-latest
-            shell: pwsh
     
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Install Pester
-        shell: ${{ matrix.shell }}
+        shell: pwsh
         run: |
           Install-Module -Name Pester -MinimumVersion 5.0.0 -Force -SkipPublisherCheck -Scope CurrentUser
 
       - name: Run Pester tests
-        shell: ${{ matrix.shell }}
+        shell: pwsh
         run: |
+          Write-Host "=== Running Pester Tests on ${{ matrix.os }} ===" -ForegroundColor Cyan
+          
           $config = New-PesterConfiguration
           $config.Run.Path = './tests'
           $config.Run.Exit = $true
@@ -60,8 +230,8 @@ jobs:
           files: testResults.xml
           check_name: PowerShell Test Results
 
-  shell-tests:
-    name: Shell Script Tests
+  test-shell:
+    name: Test Shell
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -86,149 +256,107 @@ jobs:
 
       - name: Run bats tests
         run: |
+          echo "=== Running Bats Tests on ${{ matrix.os }} ==="
           bats tests/launcher.bats
-          bats tests/launcher-windows.bats || true  # Windows tests may not fully work on Unix
+          
+          # Windows launcher tests (may not fully work on Unix but check syntax)
+          bats tests/launcher-windows.bats || echo "⚠ Windows launcher tests skipped on Unix"
 
-      - name: Upload bats results
+      - name: Upload test results
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: shell-test-results-${{ matrix.os }}
           path: tests/*.bats
 
-  lint-powershell:
-    name: Lint PowerShell
+  # ============================================================================
+  # PACKAGE (only runs after all checks pass)
+  # ============================================================================
+
+  package:
+    name: Package Release
     runs-on: ubuntu-latest
+    needs: [format-powershell, format-shell, lint-powershell, lint-shell, test-powershell, test-shell]
     
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install PSScriptAnalyzer
-        shell: pwsh
+      - name: Create PowerShell package
         run: |
-          Install-Module -Name PSScriptAnalyzer -Force -SkipPublisherCheck -Scope CurrentUser
-
-      - name: Run PSScriptAnalyzer
-        shell: pwsh
-        run: |
-          $results = Invoke-ScriptAnalyzer -Path . -Recurse -Settings ./PSScriptAnalyzerSettings.psd1 -ReportSummary
+          echo "=== Creating PowerShell package ==="
           
-          if ($results) {
-            $results | Format-Table -AutoSize
-            $errorCount = ($results | Where-Object { $_.Severity -eq 'Error' }).Count
-            $warningCount = ($results | Where-Object { $_.Severity -eq 'Warning' }).Count
-            
-            Write-Host "`n=== Summary ==="
-            Write-Host "Errors: $errorCount"
-            Write-Host "Warnings: $warningCount"
-            
-            if ($errorCount -gt 0) {
-              Write-Error "PSScriptAnalyzer found $errorCount error(s)"
-              exit 1
-            } elseif ($warningCount -gt 0) {
-              Write-Warning "PSScriptAnalyzer found $warningCount warning(s)"
-            } else {
-              Write-Host "✓ No issues found by PSScriptAnalyzer" -ForegroundColor Green
-            }
-          } else {
-            Write-Host "✓ No issues found by PSScriptAnalyzer" -ForegroundColor Green
-          }
+          mkdir -p dist
+          
+          # Create zip with PowerShell script and Windows launcher
+          zip -r dist/sony-bravia-scripts-powershell.zip \
+            sony-bravia-scripts.ps1 \
+            sony-bravia-scripts.cmd \
+            readme.md \
+            license.md
+          
+          echo "✓ PowerShell package created"
 
-      - name: Upload PSScriptAnalyzer results
+      - name: Create Shell package
+        run: |
+          echo "=== Creating Shell package ==="
+          
+          # Create zip with PowerShell script and Unix launcher
+          zip -r dist/sony-bravia-scripts-unix.zip \
+            sony-bravia-scripts.ps1 \
+            sony-bravia-scripts.sh \
+            readme.md \
+            license.md
+          
+          echo "✓ Shell package created"
+
+      - name: Create complete package
+        run: |
+          echo "=== Creating complete package ==="
+          
+          # Create zip with all files
+          zip -r dist/sony-bravia-scripts-complete.zip \
+            sony-bravia-scripts.ps1 \
+            sony-bravia-scripts.cmd \
+            sony-bravia-scripts.sh \
+            readme.md \
+            license.md \
+            PSScriptAnalyzerSettings.psd1 \
+            .shellcheckrc \
+            .editorconfig \
+            tests/
+          
+          echo "✓ Complete package created"
+
+      - name: Display package info
+        run: |
+          echo "=== Package Information ==="
+          ls -lh dist/
+          echo ""
+          echo "Packages created:"
+          echo "  - sony-bravia-scripts-powershell.zip (PowerShell + Windows launcher)"
+          echo "  - sony-bravia-scripts-unix.zip (PowerShell + Unix launcher)"
+          echo "  - sony-bravia-scripts-complete.zip (All files including tests)"
+
+      - name: Upload packages
         uses: actions/upload-artifact@v4
-        if: always()
         with:
-          name: psscriptanalyzer-results
-          path: |
-            **/*.ps1
-            PSScriptAnalyzerSettings.psd1
+          name: release-packages
+          path: dist/*.zip
+          retention-days: 30
 
-  lint-shell:
-    name: Lint Shell Scripts
-    runs-on: ubuntu-latest
-    
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Install shellcheck
+      - name: Generate release summary
         run: |
-          sudo apt-get update
-          sudo apt-get install -y shellcheck
+          echo "## 📦 Release Packages" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ All checks passed! Packages created successfully." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Available Downloads:" >> $GITHUB_STEP_SUMMARY
+          echo "- \`sony-bravia-scripts-powershell.zip\` - For Windows users" >> $GITHUB_STEP_SUMMARY
+          echo "- \`sony-bravia-scripts-unix.zip\` - For macOS/Linux users" >> $GITHUB_STEP_SUMMARY
+          echo "- \`sony-bravia-scripts-complete.zip\` - Complete source with tests" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Package Sizes:" >> $GITHUB_STEP_SUMMARY
+          ls -lh dist/ | tail -n +2 | awk '{print "- " $9 ": " $5}' >> $GITHUB_STEP_SUMMARY
 
-      - name: Run shellcheck on bash scripts
-        run: |
-          echo "=== Checking sony-bravia-scripts.sh ==="
-          shellcheck -x sony-bravia-scripts.sh || EXIT_CODE=$?
-          
-          if [ "${EXIT_CODE:-0}" -eq 0 ]; then
-            echo "✓ No issues found in shell scripts"
-          else
-            echo "✗ shellcheck found issues"
-            exit 1
-          fi
-
-      - name: Check shell script formatting
-        run: |
-          echo "=== Checking shell script format ==="
-          
-          # Check for CRLF line endings (should be LF only)
-          if file sony-bravia-scripts.sh | grep -q CRLF; then
-            echo "✗ Error: CRLF line endings detected in sony-bravia-scripts.sh"
-            exit 1
-          fi
-          
-          # Check for executable bit
-          if [ ! -x sony-bravia-scripts.sh ]; then
-            echo "⚠ Warning: sony-bravia-scripts.sh is not executable"
-          fi
-          
-          echo "✓ Shell script formatting looks good"
-
-  format-check:
-    name: Format & Style Check
-    runs-on: ubuntu-latest
-    
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Check EditorConfig compliance
-        uses: editorconfig-checker/action-editorconfig-checker@main
-
-      - name: Check for trailing whitespace
-        run: |
-          echo "=== Checking for trailing whitespace ==="
-          
-          # Check PowerShell files
-          if grep -n '[[:blank:]]$' *.ps1 2>/dev/null; then
-            echo "✗ Trailing whitespace found in PowerShell files"
-            exit 1
-          fi
-          
-          # Check shell files
-          if grep -n '[[:blank:]]$' *.sh 2>/dev/null; then
-            echo "✗ Trailing whitespace found in shell files"
-            exit 1
-          fi
-          
-          echo "✓ No trailing whitespace found"
-
-      - name: Check line endings
-        run: |
-          echo "=== Checking line endings ==="
-          
-          # Unix scripts should have LF
-          if file *.sh 2>/dev/null | grep -q CRLF; then
-            echo "✗ Error: Shell scripts have CRLF line endings (should be LF)"
-            exit 1
-          fi
-          
-          # Windows scripts should have CRLF
-          if ! file *.cmd 2>/dev/null | grep -q CRLF; then
-            echo "⚠ Warning: Windows batch files may need CRLF line endings"
-          fi
-          
-          echo "✓ Line endings look good"
 
