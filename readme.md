@@ -1,3 +1,5 @@
+<img width="270" height="270" alt="sony-bravia-adb-scripts" src="https://github.com/user-attachments/assets/367ba3e7-95f2-43c8-aab7-288cec64328c" />
+
 # sony-bravia-adb-scripts
 Sony Bravia TVs ADB scripts
 
