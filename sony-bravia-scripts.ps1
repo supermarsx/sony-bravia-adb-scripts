@@ -7,6 +7,8 @@
 
   - If run with no parameters, opens an interactive menu.
   - If run with -Action, executes that action once.
+  - Supports batch mode to run multiple actions.
+  - Maintains command history and configuration.
 
   TUI shortcuts (interactive mode):
   - Use "/" to filter actions
@@ -16,9 +18,25 @@
 
 .PARAMETER Action
   Menu action id (e.g. a1, b2, d3, h4, n1). Case-insensitive.
+  Can be comma-separated for batch mode: "a1,d3,h1"
 
 .PARAMETER Serial
   Optional adb device serial to target (passed as `adb -s <serial>`).
+
+.PARAMETER Quiet
+  Suppress informational output (errors only).
+
+.PARAMETER Verbose
+  Enable detailed diagnostic output.
+
+.PARAMETER OutputFormat
+  Output format: Text (default), JSON, or CSV.
+
+.PARAMETER Batch
+  Read actions from a file (one action per line).
+
+.PARAMETER CheckConnection
+  Verify ADB connection before running actions.
 
 .EXAMPLE
   .\sony-bravia-scripts.ps1
@@ -28,6 +46,12 @@
 
 .EXAMPLE
   .\sony-bravia-scripts.ps1 -Serial 192.168.1.20:5555 -Action d3
+
+.EXAMPLE
+  .\sony-bravia-scripts.ps1 -Action "a1,d3,h1" -Quiet
+
+.EXAMPLE
+  .\sony-bravia-scripts.ps1 -Batch actions.txt -OutputFormat JSON
 #>
 
 [CmdletBinding()]
@@ -35,19 +59,185 @@ param(
     [Parameter(Position = 0)]
     [string]$Action,
 
-    [string]$Serial
+    [string]$Serial,
+
+    [switch]$Quiet,
+
+    [ValidateSet('Text', 'JSON', 'CSV')]
+    [string]$OutputFormat = 'Text',
+
+    [string]$Batch,
+
+    [switch]$CheckConnection
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-$script:ScriptVer = '1'
+$script:ScriptVer = '2.0'
+$script:QuietMode = $Quiet
+$script:OutputFormat = $OutputFormat
+$script:VerboseLogging = $VerbosePreference -eq 'Continue'
+
+# Configuration and history paths
+$script:ConfigDir = Join-Path $env:USERPROFILE '.sony-bravia-scripts'
+$script:ConfigFile = Join-Path $script:ConfigDir 'config.json'
+$script:HistoryFile = Join-Path $script:ConfigDir 'history.json'
+$script:MaxHistoryItems = 100
+
+# Initialize configuration
+function Initialize-Config {
+    if (-not (Test-Path $script:ConfigDir)) {
+        New-Item -ItemType Directory -Path $script:ConfigDir -Force | Out-Null
+    }
+    
+    if (-not (Test-Path $script:ConfigFile)) {
+        $defaultConfig = @{
+            version = $script:ScriptVer
+            defaultSerial = $null
+            deviceAliases = @{}
+            retryAttempts = 3
+            retryDelayMs = 1000
+            checkConnectionBeforeAction = $true
+        }
+        $defaultConfig | ConvertTo-Json | Set-Content $script:ConfigFile
+    }
+}
+
+function Get-Config {
+    if (Test-Path $script:ConfigFile) {
+        return Get-Content $script:ConfigFile | ConvertFrom-Json
+    }
+    return $null
+}
+
+function Set-ConfigValue {
+    param(
+        [Parameter(Mandatory)]
+        [string]$Key,
+        
+        [Parameter(Mandatory)]
+        $Value
+    )
+    
+    $config = Get-Config
+    if ($config) {
+        $config.$Key = $Value
+        $config | ConvertTo-Json | Set-Content $script:ConfigFile
+    }
+}
+
+function Add-ToHistory {
+    param(
+        [Parameter(Mandatory)]
+        [string]$Action,
+        
+        [string]$Serial,
+        
+        [bool]$Success,
+        
+        [string]$ErrorMessage
+    )
+    
+    $history = @()
+    if (Test-Path $script:HistoryFile) {
+        $history = Get-Content $script:HistoryFile | ConvertFrom-Json
+    }
+    
+    $entry = @{
+        timestamp = (Get-Date).ToString('o')
+        action = $Action
+        serial = $Serial
+        success = $Success
+        error = $ErrorMessage
+    }
+    
+    $history = @($entry) + $history | Select-Object -First $script:MaxHistoryItems
+    $history | ConvertTo-Json | Set-Content $script:HistoryFile
+}
+
+function Get-History {
+    param([int]$Last = 10)
+    
+    if (Test-Path $script:HistoryFile) {
+        $history = Get-Content $script:HistoryFile | ConvertFrom-Json
+        return $history | Select-Object -First $Last
+    }
+    return @()
+}
+
+function Write-Log {
+    param(
+        [Parameter(Mandatory)]
+        [string]$Message,
+        
+        [ValidateSet('Info', 'Warning', 'Error', 'Verbose')]
+        [string]$Level = 'Info'
+    )
+    
+    if ($script:QuietMode -and $Level -ne 'Error') {
+        return
+    }
+    
+    if ($Level -eq 'Verbose' -and -not $script:VerboseLogging) {
+        return
+    }
+    
+    if ($script:OutputFormat -eq 'JSON' -or $script:OutputFormat -eq 'CSV') {
+        # Don't write logs in structured formats, collect for final output
+        return
+    }
+    
+    $color = switch ($Level) {
+        'Info' { 'Gray' }
+        'Warning' { 'Yellow' }
+        'Error' { 'Red' }
+        'Verbose' { 'DarkGray' }
+    }
+    
+    Write-Host $Message -ForegroundColor $color
+}
+
+function Test-AdbConnection {
+    param(
+        [int]$RetryCount = 3,
+        [int]$RetryDelayMs = 1000
+    )
+    
+    Write-Log "Checking ADB connection..." -Level Verbose
+    
+    for ($i = 0; $i -lt $RetryCount; $i++) {
+        try {
+            $devices = & adb devices 2>&1
+            if ($LASTEXITCODE -eq 0) {
+                $deviceLines = $devices | Where-Object { $_ -match '\t(device|offline|unauthorized)' }
+                
+                if ($deviceLines) {
+                    Write-Log "ADB connection verified ($($deviceLines.Count) device(s) found)" -Level Verbose
+                    return $true
+                }
+            }
+        }
+        catch {
+            Write-Log "Connection check attempt $($i + 1) failed: $($_.Exception.Message)" -Level Verbose
+        }
+        
+        if ($i -lt $RetryCount - 1) {
+            Write-Log "Retrying in $($RetryDelayMs)ms..." -Level Verbose
+            Start-Sleep -Milliseconds $RetryDelayMs
+        }
+    }
+    
+    Write-Log "No ADB devices found. Make sure your device is connected and ADB is enabled." -Level Warning
+    return $false
+}
 
 function Test-AdbAvailable {
     $adb = Get-Command adb -ErrorAction SilentlyContinue
     if (-not $adb) {
         throw "adb was not found on PATH. Install Android platform-tools and ensure 'adb' is available."
     }
+
 }
 
 function Invoke-Adb {
@@ -58,18 +248,26 @@ function Invoke-Adb {
   .DESCRIPTION
     Central wrapper for calling adb.
     - Adds `-s <Serial>` when -Serial is provided.
-    - Prints the command being executed.
+    - Prints the command being executed (unless quiet mode).
     - Throws on non-zero exit unless -AllowFailure is set.
+    - Supports retry logic for connection failures.
   #>
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)]
         [string[]]$Args,
 
-        [switch]$AllowFailure
+        [switch]$AllowFailure,
+
+        [int]$RetryCount = 0
     )
 
     Test-AdbAvailable
+
+    $config = Get-Config
+    if ($RetryCount -eq 0 -and $config) {
+        $RetryCount = $config.retryAttempts
+    }
 
     $fullArgs = @()
     if ($Serial) {
@@ -77,15 +275,68 @@ function Invoke-Adb {
     }
     $fullArgs += $Args
 
-    Write-Host "" 
-    Write-Host "Executing: adb $($fullArgs -join ' ')" -ForegroundColor DarkGray
-    Write-Host "" 
+    $attempt = 0
+    $lastError = $null
 
-    $output = & adb @fullArgs 2>&1
-    $exit = $LASTEXITCODE
+    while ($attempt -le $RetryCount) {
+        if ($attempt -gt 0) {
+            Write-Log "Retry attempt $attempt/$RetryCount..." -Level Verbose
+            Start-Sleep -Milliseconds ($config.retryDelayMs)
+        }
 
-    if ($output) {
-        $output | ForEach-Object { Write-Host $_ }
+        try {
+            if (-not $script:QuietMode -and $script:OutputFormat -eq 'Text') {
+                Write-Host "" 
+                Write-Host "Executing: adb $($fullArgs -join ' ')" -ForegroundColor DarkGray
+                Write-Host "" 
+            }
+
+            $output = & adb @fullArgs 2>&1
+            $exit = $LASTEXITCODE
+
+            if ($output -and $script:OutputFormat -eq 'Text') {
+                $output | ForEach-Object { Write-Host $_ }
+            }
+
+            if (-not $AllowFailure -and $exit -ne 0) {
+                $errorMsg = $output -join "`n"
+                
+                # Check for common errors that might benefit from retry
+                if ($errorMsg -match 'device offline|device not found|no devices|protocol fault') {
+                    $lastError = "ADB connection error: $errorMsg"
+                    $attempt++
+                    continue
+                }
+                
+                throw "adb exited with code $exit: $errorMsg"
+            }
+
+            return [pscustomobject]@{
+                ExitCode = $exit
+                Output   = ($output -join "`n")
+                Success  = ($exit -eq 0)
+            }
+        }
+        catch {
+            $lastError = $_.Exception.Message
+            
+            if ($attempt -ge $RetryCount) {
+                if ($AllowFailure) {
+                    return [pscustomobject]@{
+                        ExitCode = -1
+                        Output   = $lastError
+                        Success  = $false
+                    }
+                }
+                throw
+            }
+            
+            $attempt++
+        }
+    }
+
+    if ($lastError) {
+        throw $lastError
     }
 
     if (-not $AllowFailure -and $exit -ne 0) {
@@ -1234,17 +1485,150 @@ function Start-Tui {
 }
 
 try {
+    # Initialize configuration and history
+    Initialize-Config
+    
+    # Load configuration
+    $config = Get-Config
+    
+    # Use default serial from config if not specified
+    if (-not $Serial -and $config -and $config.defaultSerial) {
+        $Serial = $config.defaultSerial
+        Write-Log "Using default serial from config: $Serial" -Level Verbose
+    }
+    
+    # Check connection if requested or configured
+    if ($CheckConnection -or ($config -and $config.checkConnectionBeforeAction)) {
+        if (-not (Test-AdbConnection)) {
+            Write-Log "Warning: No ADB connection detected. Some operations may fail." -Level Warning
+        }
+    }
+    
+    # Batch mode from file
+    if ($Batch) {
+        if (-not (Test-Path $Batch)) {
+            throw "Batch file not found: $Batch"
+        }
+        
+        $actions = Get-Content $Batch | Where-Object { $_ -and $_ -notmatch '^\s*#' }
+        Write-Log "Processing $($actions.Count) actions from batch file..." -Level Info
+        
+        $results = @()
+        foreach ($batchAction in $actions) {
+            try {
+                Write-Log "Executing: $batchAction" -Level Info
+                $result = Invoke-Action -Id $batchAction -Quiet
+                $results += [pscustomobject]@{
+                    Action = $batchAction
+                    Success = $true
+                    Error = $null
+                }
+                Add-ToHistory -Action $batchAction -Serial $Serial -Success $true -ErrorMessage $null
+            }
+            catch {
+                $results += [pscustomobject]@{
+                    Action = $batchAction
+                    Success = $false
+                    Error = $_.Exception.Message
+                }
+                Add-ToHistory -Action $batchAction -Serial $Serial -Success $false -ErrorMessage $_.Exception.Message
+                Write-Log "Error executing $batchAction : $($_.Exception.Message)" -Level Error
+            }
+        }
+        
+        # Output results
+        if ($OutputFormat -eq 'JSON') {
+            $results | ConvertTo-Json
+        } elseif ($OutputFormat -eq 'CSV') {
+            $results | ConvertTo-Csv -NoTypeInformation
+        } else {
+            Write-Host "`nBatch Summary:" -ForegroundColor Cyan
+            $results | Format-Table -AutoSize
+        }
+        
+        $failedCount = ($results | Where-Object { -not $_.Success }).Count
+        exit $(if ($failedCount -gt 0) { 1 } else { 0 })
+    }
+    
+    # Comma-separated batch mode
+    if ($Action -and $Action.Contains(',')) {
+        $actions = $Action -split ',' | ForEach-Object { $_.Trim() }
+        Write-Log "Processing $($actions.Count) actions in batch mode..." -Level Info
+        
+        $results = @()
+        foreach ($batchAction in $actions) {
+            try {
+                Write-Log "Executing: $batchAction" -Level Info
+                $result = Invoke-Action -Id $batchAction -Quiet
+                $results += [pscustomobject]@{
+                    Action = $batchAction
+                    Success = $true
+                    Error = $null
+                }
+                Add-ToHistory -Action $batchAction -Serial $Serial -Success $true -ErrorMessage $null
+            }
+            catch {
+                $results += [pscustomobject]@{
+                    Action = $batchAction
+                    Success = $false
+                    Error = $_.Exception.Message
+                }
+                Add-ToHistory -Action $batchAction -Serial $Serial -Success $false -ErrorMessage $_.Exception.Message
+                Write-Log "Error executing $batchAction : $($_.Exception.Message)" -Level Error
+            }
+        }
+        
+        # Output results
+        if ($OutputFormat -eq 'JSON') {
+            $results | ConvertTo-Json
+        } elseif ($OutputFormat -eq 'CSV') {
+            $results | ConvertTo-Csv -NoTypeInformation
+        } else {
+            Write-Host "`nBatch Summary:" -ForegroundColor Cyan
+            $results | Format-Table -AutoSize
+        }
+        
+        $failedCount = ($results | Where-Object { -not $_.Success }).Count
+        exit $(if ($failedCount -gt 0) { 1 } else { 0 })
+    }
+    
+    # Single action mode
     if ($Action) {
-        $cont = Invoke-Action -Id $Action
-        exit 0
+        try {
+            $cont = Invoke-Action -Id $Action
+            Add-ToHistory -Action $Action -Serial $Serial -Success $true -ErrorMessage $null
+            exit 0
+        }
+        catch {
+            Add-ToHistory -Action $Action -Serial $Serial -Success $false -ErrorMessage $_.Exception.Message
+            throw
+        }
     }
 
+    # Interactive TUI mode
     Start-Tui
 }
 catch {
-    Write-Host "" 
-    Write-Host "ERROR: $($_.Exception.Message)" -ForegroundColor Red
-    Write-Host "" 
-    Pause-Continue
+    if ($script:OutputFormat -eq 'JSON') {
+        @{
+            success = $false
+            error = $_.Exception.Message
+            timestamp = (Get-Date).ToString('o')
+        } | ConvertTo-Json
+    } else {
+        Write-Host "" 
+        Write-Host "ERROR: $($_.Exception.Message)" -ForegroundColor Red
+        Write-Host "" 
+        if (-not $script:QuietMode) {
+            Write-Host "Troubleshooting tips:" -ForegroundColor Yellow
+            Write-Host "  1. Verify ADB is installed and in PATH: adb version" -ForegroundColor Gray
+            Write-Host "  2. Check device connection: adb devices" -ForegroundColor Gray
+            Write-Host "  3. Enable USB debugging on your TV" -ForegroundColor Gray
+            Write-Host "  4. Try reconnecting: adb disconnect; adb connect <ip>:5555" -ForegroundColor Gray
+            Write-Host "  5. See troubleshooting guide: docs/TROUBLESHOOTING.md" -ForegroundColor Gray
+            Write-Host ""
+        }
+        Pause-Continue
+    }
     exit 1
 }

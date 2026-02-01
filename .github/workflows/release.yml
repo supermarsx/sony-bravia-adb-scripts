@@ -1,0 +1,280 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., v2.0.0)'
+        required: true
+        type: string
+      prerelease:
+        description: 'Mark as pre-release'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Determine version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ inputs.version }}"
+          else
+            VERSION="${GITHUB_REF#refs/tags/}"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
+      
+      - name: Generate changelog
+        id: changelog
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          PREV_TAG=$(git describe --tags --abbrev=0 "${VERSION}^" 2>/dev/null || echo "")
+          
+          echo "# Release ${VERSION}" > RELEASE_NOTES.md
+          echo "" >> RELEASE_NOTES.md
+          
+          if [ -n "$PREV_TAG" ]; then
+            echo "## Changes since ${PREV_TAG}" >> RELEASE_NOTES.md
+            echo "" >> RELEASE_NOTES.md
+            git log "${PREV_TAG}..${VERSION}" --pretty=format:"- %s (%h)" >> RELEASE_NOTES.md
+          else
+            echo "## Initial Release" >> RELEASE_NOTES.md
+            echo "" >> RELEASE_NOTES.md
+            echo "First version of Sony Bravia ADB Scripts with 70+ TV control actions." >> RELEASE_NOTES.md
+          fi
+          
+          echo "" >> RELEASE_NOTES.md
+          echo "## Installation" >> RELEASE_NOTES.md
+          echo "" >> RELEASE_NOTES.md
+          echo "### Windows" >> RELEASE_NOTES.md
+          echo '```powershell' >> RELEASE_NOTES.md
+          echo '# Download and extract sony-bravia-scripts-powershell.zip' >> RELEASE_NOTES.md
+          echo '# Then run:' >> RELEASE_NOTES.md
+          echo '.\install.ps1' >> RELEASE_NOTES.md
+          echo '```' >> RELEASE_NOTES.md
+          echo "" >> RELEASE_NOTES.md
+          echo "### macOS/Linux" >> RELEASE_NOTES.md
+          echo '```bash' >> RELEASE_NOTES.md
+          echo '# Download and extract sony-bravia-scripts-unix.zip' >> RELEASE_NOTES.md
+          echo '# Then run:' >> RELEASE_NOTES.md
+          echo 'chmod +x install.sh' >> RELEASE_NOTES.md
+          echo './install.sh' >> RELEASE_NOTES.md
+          echo '```' >> RELEASE_NOTES.md
+          echo "" >> RELEASE_NOTES.md
+          echo "## Features" >> RELEASE_NOTES.md
+          echo "" >> RELEASE_NOTES.md
+          echo "- 70+ ADB control actions for Sony Bravia TVs" >> RELEASE_NOTES.md
+          echo "- Interactive TUI menu system" >> RELEASE_NOTES.md
+          echo "- CLI mode with action codes" >> RELEASE_NOTES.md
+          echo "- Batch execution mode (file or comma-separated)" >> RELEASE_NOTES.md
+          echo "- Configuration file support (~/.sony-bravia-scripts/config.json)" >> RELEASE_NOTES.md
+          echo "- Command history tracking" >> RELEASE_NOTES.md
+          echo "- Multiple output formats (Text, JSON, CSV)" >> RELEASE_NOTES.md
+          echo "- Connection validation with retry logic" >> RELEASE_NOTES.md
+          echo "- Quiet/Verbose modes" >> RELEASE_NOTES.md
+          echo "- Cross-platform (Windows, macOS, Linux)" >> RELEASE_NOTES.md
+          echo "" >> RELEASE_NOTES.md
+          echo "## Requirements" >> RELEASE_NOTES.md
+          echo "" >> RELEASE_NOTES.md
+          echo "- PowerShell 7+ (cross-platform)" >> RELEASE_NOTES.md
+          echo "- ADB (Android Debug Bridge)" >> RELEASE_NOTES.md
+          echo "- Sony Bravia TV with USB debugging enabled" >> RELEASE_NOTES.md
+          echo "" >> RELEASE_NOTES.md
+          echo "## Documentation" >> RELEASE_NOTES.md
+          echo "" >> RELEASE_NOTES.md
+          echo "- [README](readme.md) - Getting started guide" >> RELEASE_NOTES.md
+          echo "- [Troubleshooting](docs/TROUBLESHOOTING.md) - Common issues and solutions" >> RELEASE_NOTES.md
+          echo "- [Recipes](docs/RECIPES.md) - Example use cases" >> RELEASE_NOTES.md
+          echo "- [FAQ](docs/FAQ.md) - Frequently asked questions" >> RELEASE_NOTES.md
+          
+          cat RELEASE_NOTES.md
+      
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.version.outputs.version }}
+          release_name: Sony Bravia ADB Scripts ${{ steps.version.outputs.version }}
+          body_path: RELEASE_NOTES.md
+          draft: false
+          prerelease: ${{ inputs.prerelease || false }}
+
+  build-packages:
+    needs: create-release
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            package: powershell
+          - os: ubuntu-latest
+            package: unix
+          - os: ubuntu-latest
+            package: complete
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Install PowerShell (Ubuntu)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wget apt-transport-https software-properties-common
+          wget -q "https://packages.microsoft.com/config/ubuntu/$(lsb_release -rs)/packages-microsoft-prod.deb"
+          sudo dpkg -i packages-microsoft-prod.deb
+          rm packages-microsoft-prod.deb
+          sudo apt-get update
+          sudo apt-get install -y powershell
+      
+      - name: Create package
+        shell: pwsh
+        run: |
+          Write-Host "Creating package: ${{ matrix.package }}"
+          
+          $outputDir = "release"
+          New-Item -ItemType Directory -Force -Path $outputDir | Out-Null
+          
+          $packageName = "sony-bravia-scripts-${{ matrix.package }}"
+          $packagePath = Join-Path $outputDir "$packageName"
+          
+          # Create package directory
+          New-Item -ItemType Directory -Force -Path $packagePath | Out-Null
+          
+          # Copy files based on package type
+          if ("${{ matrix.package }}" -eq "powershell") {
+              Copy-Item "sony-bravia-scripts.ps1" -Destination $packagePath
+              Copy-Item "sony-bravia-scripts.cmd" -Destination $packagePath
+              Copy-Item "install.ps1" -Destination $packagePath
+              Copy-Item "readme.md" -Destination $packagePath
+              Copy-Item "license.md" -Destination $packagePath
+              if (Test-Path "docs") {
+                  Copy-Item "docs" -Destination $packagePath -Recurse
+              }
+          }
+          elseif ("${{ matrix.package }}" -eq "unix") {
+              Copy-Item "sony-bravia-scripts.ps1" -Destination $packagePath
+              Copy-Item "sony-bravia-scripts.sh" -Destination $packagePath
+              Copy-Item "install.sh" -Destination $packagePath
+              Copy-Item "readme.md" -Destination $packagePath
+              Copy-Item "license.md" -Destination $packagePath
+              if (Test-Path "docs") {
+                  Copy-Item "docs" -Destination $packagePath -Recurse
+              }
+          }
+          else {
+              # Complete package with everything
+              Copy-Item "sony-bravia-scripts.ps1" -Destination $packagePath
+              Copy-Item "sony-bravia-scripts.cmd" -Destination $packagePath
+              Copy-Item "sony-bravia-scripts.sh" -Destination $packagePath
+              Copy-Item "install.ps1" -Destination $packagePath
+              Copy-Item "install.sh" -Destination $packagePath
+              Copy-Item "readme.md" -Destination $packagePath
+              Copy-Item "license.md" -Destination $packagePath
+              if (Test-Path "docs") {
+                  Copy-Item "docs" -Destination $packagePath -Recurse
+              }
+              if (Test-Path "tests") {
+                  Copy-Item "tests" -Destination $packagePath -Recurse
+              }
+              if (Test-Path "dev") {
+                  Copy-Item "dev" -Destination $packagePath -Recurse
+              }
+          }
+          
+          # Create zip
+          $zipPath = Join-Path $outputDir "$packageName.zip"
+          Compress-Archive -Path $packagePath -DestinationPath $zipPath -Force
+          
+          Write-Host "Package created: $zipPath"
+          Write-Host "Package size: $((Get-Item $zipPath).Length / 1KB) KB"
+      
+      - name: Upload package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sony-bravia-scripts-${{ matrix.package }}
+          path: release/sony-bravia-scripts-${{ matrix.package }}.zip
+      
+      - name: Upload to release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: release/sony-bravia-scripts-${{ matrix.package }}.zip
+          asset_name: sony-bravia-scripts-${{ matrix.package }}.zip
+          asset_content_type: application/zip
+
+  update-release-summary:
+    needs: [create-release, build-packages]
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Generate package summary
+        run: |
+          echo "# Release Artifacts" > PACKAGE_SUMMARY.md
+          echo "" >> PACKAGE_SUMMARY.md
+          echo "| Package | Description | Recommended For |" >> PACKAGE_SUMMARY.md
+          echo "|---------|-------------|-----------------|" >> PACKAGE_SUMMARY.md
+          echo "| **sony-bravia-scripts-powershell.zip** | Windows package with .cmd launcher and install.ps1 | Windows users |" >> PACKAGE_SUMMARY.md
+          echo "| **sony-bravia-scripts-unix.zip** | Unix package with .sh launcher and install.sh | macOS/Linux users |" >> PACKAGE_SUMMARY.md
+          echo "| **sony-bravia-scripts-complete.zip** | Complete package with all platforms, tests, and dev tools | Developers and contributors |" >> PACKAGE_SUMMARY.md
+          echo "" >> PACKAGE_SUMMARY.md
+          echo "## Quick Start" >> PACKAGE_SUMMARY.md
+          echo "" >> PACKAGE_SUMMARY.md
+          echo "1. Download the appropriate package for your platform" >> PACKAGE_SUMMARY.md
+          echo "2. Extract the archive" >> PACKAGE_SUMMARY.md
+          echo "3. Run the installation script:" >> PACKAGE_SUMMARY.md
+          echo "   - Windows: \`.\install.ps1\`" >> PACKAGE_SUMMARY.md
+          echo "   - macOS/Linux: \`./install.sh\`" >> PACKAGE_SUMMARY.md
+          echo "" >> PACKAGE_SUMMARY.md
+          echo "For detailed instructions, see the [README](readme.md)." >> PACKAGE_SUMMARY.md
+          
+          cat PACKAGE_SUMMARY.md
+      
+      - name: Comment on release
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const summary = fs.readFileSync('PACKAGE_SUMMARY.md', 'utf8');
+            
+            const releases = await github.rest.repos.listReleases({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+            });
+            
+            const release = releases.data.find(r => r.tag_name === '${{ needs.create-release.outputs.version }}');
+            
+            if (release) {
+              await github.rest.repos.updateRelease({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                release_id: release.id,
+                body: release.body + '\n\n---\n\n' + summary
+              });
+            }
