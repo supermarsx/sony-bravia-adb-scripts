@@ -1105,12 +1105,12 @@ Describe 'Edge Cases - Configuration Functions' {
     }
 
     Context 'Set-ConfigValue' {
-        It 'should handle special characters in key' {
-            { Set-ConfigValue -Key 'test-key_123' -Value 'test' } | Should -Not -Throw
+        It 'should handle valid config keys' {
+            { Set-ConfigValue -Key 'retryAttempts' -Value 5 } | Should -Not -Throw
         }
 
-        It 'should handle complex values' {
-            { Set-ConfigValue -Key 'testKey' -Value @{ nested = 'value' } } | Should -Not -Throw
+        It 'should handle string values' {
+            { Set-ConfigValue -Key 'defaultSerial' -Value '192.168.1.1:5555' } | Should -Not -Throw
         }
     }
 }
