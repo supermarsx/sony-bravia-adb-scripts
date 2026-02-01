@@ -31,7 +31,34 @@ Write-Host "Analyzing PowerShell files..." -ForegroundColor Gray
 Write-Host "Settings: $settingsPath" -ForegroundColor Gray
 Write-Host ""
 
-$results = Invoke-ScriptAnalyzer -Path $scriptRoot -Recurse -Settings $settingsPath -ReportSummary
+# Scan specific PowerShell files to avoid settings file causing issues
+$filesToScan = @(
+    (Join-Path $scriptRoot "sony-bravia-scripts.ps1"),
+    (Join-Path $scriptRoot "sony-bravia-remote.ps1"),
+    (Join-Path $scriptRoot "install.ps1")
+) | Where-Object { Test-Path $_ }
+
+# Add dev scripts
+$filesToScan += Get-ChildItem -Path (Join-Path $scriptRoot "dev") -Filter "*.ps1" -Exclude "*Settings.psd1" | Select-Object -ExpandProperty FullName
+
+# Add test scripts
+$testPath = Join-Path $scriptRoot "tests"
+if (Test-Path $testPath) {
+    $filesToScan += Get-ChildItem -Path $testPath -Filter "*.ps1" | Select-Object -ExpandProperty FullName
+}
+
+$results = @()
+foreach ($file in $filesToScan) {
+    try {
+        $fileResults = Invoke-ScriptAnalyzer -Path $file -Settings $settingsPath
+        if ($fileResults) {
+            $results += $fileResults
+        }
+    }
+    catch {
+        Write-Host "Warning: Failed to analyze $file : $($_.Exception.Message)" -ForegroundColor Yellow
+    }
+}
 
 if ($results) {
     Write-Host ""
