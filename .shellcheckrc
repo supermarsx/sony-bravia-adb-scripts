@@ -1,0 +1,15 @@
+# .shellcheckrc
+# ShellCheck configuration for sony-bravia-scripts.sh
+
+# Disable specific warnings
+disable=SC2181  # Check exit code directly with e.g. 'if mycmd;', not indirectly with $?
+disable=SC2155  # Declare and assign separately to avoid masking return values
+
+# Enable optional checks
+enable=all
+
+# Specify shell dialect
+shell=bash
+
+# Source path for included scripts
+source-path=SCRIPTDIR

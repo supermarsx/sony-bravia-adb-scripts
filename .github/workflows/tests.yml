@@ -1,0 +1,234 @@
+name: Tests
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master, develop ]
+  workflow_dispatch:
+
+jobs:
+  powershell-tests:
+    name: PowerShell Tests
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            shell: pwsh
+          - os: windows-latest
+            shell: pwsh
+          - os: macos-latest
+            shell: pwsh
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Pester
+        shell: ${{ matrix.shell }}
+        run: |
+          Install-Module -Name Pester -MinimumVersion 5.0.0 -Force -SkipPublisherCheck -Scope CurrentUser
+
+      - name: Run Pester tests
+        shell: ${{ matrix.shell }}
+        run: |
+          $config = New-PesterConfiguration
+          $config.Run.Path = './tests'
+          $config.Run.Exit = $true
+          $config.Output.Verbosity = 'Detailed'
+          $config.CodeCoverage.Enabled = $false
+          $config.TestResult.Enabled = $true
+          $config.TestResult.OutputFormat = 'NUnitXml'
+          $config.TestResult.OutputPath = 'testResults.xml'
+          
+          Invoke-Pester -Configuration $config
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: powershell-test-results-${{ matrix.os }}
+          path: testResults.xml
+
+      - name: Publish test results
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        if: always() && matrix.os == 'ubuntu-latest'
+        with:
+          files: testResults.xml
+          check_name: PowerShell Test Results
+
+  shell-tests:
+    name: Shell Script Tests
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install bats
+        run: |
+          if [ "$RUNNER_OS" == "Linux" ]; then
+            sudo apt-get update
+            sudo apt-get install -y bats
+          elif [ "$RUNNER_OS" == "macOS" ]; then
+            brew install bats-core
+          fi
+
+      - name: Make scripts executable
+        run: chmod +x sony-bravia-scripts.sh
+
+      - name: Run bats tests
+        run: |
+          bats tests/launcher.bats
+          bats tests/launcher-windows.bats || true  # Windows tests may not fully work on Unix
+
+      - name: Upload bats results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: shell-test-results-${{ matrix.os }}
+          path: tests/*.bats
+
+  lint-powershell:
+    name: Lint PowerShell
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install PSScriptAnalyzer
+        shell: pwsh
+        run: |
+          Install-Module -Name PSScriptAnalyzer -Force -SkipPublisherCheck -Scope CurrentUser
+
+      - name: Run PSScriptAnalyzer
+        shell: pwsh
+        run: |
+          $results = Invoke-ScriptAnalyzer -Path . -Recurse -Settings ./PSScriptAnalyzerSettings.psd1 -ReportSummary
+          
+          if ($results) {
+            $results | Format-Table -AutoSize
+            $errorCount = ($results | Where-Object { $_.Severity -eq 'Error' }).Count
+            $warningCount = ($results | Where-Object { $_.Severity -eq 'Warning' }).Count
+            
+            Write-Host "`n=== Summary ==="
+            Write-Host "Errors: $errorCount"
+            Write-Host "Warnings: $warningCount"
+            
+            if ($errorCount -gt 0) {
+              Write-Error "PSScriptAnalyzer found $errorCount error(s)"
+              exit 1
+            } elseif ($warningCount -gt 0) {
+              Write-Warning "PSScriptAnalyzer found $warningCount warning(s)"
+            } else {
+              Write-Host "✓ No issues found by PSScriptAnalyzer" -ForegroundColor Green
+            }
+          } else {
+            Write-Host "✓ No issues found by PSScriptAnalyzer" -ForegroundColor Green
+          }
+
+      - name: Upload PSScriptAnalyzer results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: psscriptanalyzer-results
+          path: |
+            **/*.ps1
+            PSScriptAnalyzerSettings.psd1
+
+  lint-shell:
+    name: Lint Shell Scripts
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install shellcheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+
+      - name: Run shellcheck on bash scripts
+        run: |
+          echo "=== Checking sony-bravia-scripts.sh ==="
+          shellcheck -x sony-bravia-scripts.sh || EXIT_CODE=$?
+          
+          if [ "${EXIT_CODE:-0}" -eq 0 ]; then
+            echo "✓ No issues found in shell scripts"
+          else
+            echo "✗ shellcheck found issues"
+            exit 1
+          fi
+
+      - name: Check shell script formatting
+        run: |
+          echo "=== Checking shell script format ==="
+          
+          # Check for CRLF line endings (should be LF only)
+          if file sony-bravia-scripts.sh | grep -q CRLF; then
+            echo "✗ Error: CRLF line endings detected in sony-bravia-scripts.sh"
+            exit 1
+          fi
+          
+          # Check for executable bit
+          if [ ! -x sony-bravia-scripts.sh ]; then
+            echo "⚠ Warning: sony-bravia-scripts.sh is not executable"
+          fi
+          
+          echo "✓ Shell script formatting looks good"
+
+  format-check:
+    name: Format & Style Check
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check EditorConfig compliance
+        uses: editorconfig-checker/action-editorconfig-checker@main
+
+      - name: Check for trailing whitespace
+        run: |
+          echo "=== Checking for trailing whitespace ==="
+          
+          # Check PowerShell files
+          if grep -n '[[:blank:]]$' *.ps1 2>/dev/null; then
+            echo "✗ Trailing whitespace found in PowerShell files"
+            exit 1
+          fi
+          
+          # Check shell files
+          if grep -n '[[:blank:]]$' *.sh 2>/dev/null; then
+            echo "✗ Trailing whitespace found in shell files"
+            exit 1
+          fi
+          
+          echo "✓ No trailing whitespace found"
+
+      - name: Check line endings
+        run: |
+          echo "=== Checking line endings ==="
+          
+          # Unix scripts should have LF
+          if file *.sh 2>/dev/null | grep -q CRLF; then
+            echo "✗ Error: Shell scripts have CRLF line endings (should be LF)"
+            exit 1
+          fi
+          
+          # Windows scripts should have CRLF
+          if ! file *.cmd 2>/dev/null | grep -q CRLF; then
+            echo "⚠ Warning: Windows batch files may need CRLF line endings"
+          fi
+          
+          echo "✓ Line endings look good"
+
