@@ -455,14 +455,21 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Delete the rolling tag and release if they exist
+          # Delete old rolling releases and tags
           gh release delete rolling --yes || true
           git push origin :refs/tags/rolling || true
+          # Also delete any old rolling-* tags
+          git tag -l 'rolling-*' | xargs -r git push --delete origin || true
+          git tag -l 'rolling-*' | xargs -r git tag -d || true
 
       - name: Create rolling tag
         run: |
+          SHORT_HASH=$(git rev-parse --short HEAD)
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -f "rolling-${SHORT_HASH}"
+          git push -f origin "rolling-${SHORT_HASH}"
+          # Also update the rolling tag to point to this commit
           git tag -f rolling
           git push -f origin rolling
 
@@ -470,19 +477,21 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create rolling \
-            --title "Rolling Release (${{ steps.release_info.outputs.short_hash }})" \
+          SHORT_HASH=$(git rev-parse --short HEAD)
+          gh release create "rolling-${SHORT_HASH}" \
+            --title "Rolling Release - ${SHORT_HASH}" \
             --notes-file RELEASE_NOTES.md \
-            --prerelease \
+            --latest \
             dist/sony-bravia-scripts-powershell.zip \
             dist/sony-bravia-scripts-unix.zip \
             dist/sony-bravia-scripts-complete.zip
 
       - name: Update release summary
         run: |
+          SHORT_HASH=$(git rev-parse --short HEAD)
           echo "## 🚀 Rolling Release Published" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Release:** [rolling (${{ steps.release_info.outputs.short_hash }})](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/tag/rolling)" >> $GITHUB_STEP_SUMMARY
+          echo "**Release:** [rolling-${SHORT_HASH}](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/tag/rolling-${SHORT_HASH})" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Packages Available:" >> $GITHUB_STEP_SUMMARY
           echo "- sony-bravia-scripts-powershell.zip" >> $GITHUB_STEP_SUMMARY
