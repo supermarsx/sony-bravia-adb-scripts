@@ -349,7 +349,7 @@ function Invoke-Adb {
     }
 }
 
-function Pause-Continue {
+function Wait-ForContinue {
     param([string]$Message = 'Press any key to continue...')
     Write-Host "" 
     $null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
@@ -2163,7 +2163,7 @@ try {
     # Single action mode
     if ($Action) {
         try {
-            $cont = Invoke-Action -Id $Action
+            Invoke-Action -Id $Action | Out-Null
             Add-ToHistory -Action $Action -Serial $Serial -Success $true -ErrorMessage $null
             exit 0
         }
@@ -2197,7 +2197,7 @@ catch {
             Write-Host "  5. See troubleshooting guide: docs/TROUBLESHOOTING.md" -ForegroundColor Gray
             Write-Host ""
         }
-        Pause-Continue
+        Wait-ForContinue
     }
     exit 1
 }

@@ -36,7 +36,7 @@ function Send-RemoteKey {
     }
 }
 
-function Draw-Button {
+function Show-Button {
     param(
         [int]$X,
         [int]$Y,
@@ -78,7 +78,7 @@ function Get-ButtonAtPosition {
     return $null
 }
 
-function Draw-Remote {
+function Show-Remote {
     param([string]$HighlightedButton = $null)
     
     [Console]::Clear()
@@ -95,7 +95,7 @@ function Draw-Remote {
     # Draw all buttons
     foreach ($btn in $script:Buttons) {
         $isHighlighted = ($btn.Id -eq $HighlightedButton)
-        Draw-Button -X $btn.X -Y $btn.Y -Label $btn.Label -Width $btn.Width -Color $btn.Color -IsHighlighted $isHighlighted
+        Show-Button -X $btn.X -Y $btn.Y -Label $btn.Label -Width $btn.Width -Color $btn.Color -IsHighlighted $isHighlighted
     }
     
     # Instructions
@@ -166,14 +166,12 @@ function Start-RemoteControl {
     }
     
     $selectedButton = 0
-    Draw-Remote -HighlightedButton $script:Buttons[$selectedButton].Id
+    Show-Remote -HighlightedButton $script:Buttons[$selectedButton].Id
     
     # Enable mouse input if available (Windows only)
-    $mouseSupported = $false
     if ($PSVersionTable.Platform -eq 'Win32NT' -or [string]::IsNullOrEmpty($PSVersionTable.Platform)) {
         try {
             [Console]::TreatControlCAsInput = $true
-            $mouseSupported = $true
         }
         catch {
             Write-Host "Mouse support not available on this platform" -ForegroundColor DarkGray
@@ -197,11 +195,11 @@ function Start-RemoteControl {
                 }
                 'UpArrow' {
                     $selectedButton = ($selectedButton - 1 + $script:Buttons.Count) % $script:Buttons.Count
-                    Draw-Remote -HighlightedButton $script:Buttons[$selectedButton].Id
+                    Show-Remote -HighlightedButton $script:Buttons[$selectedButton].Id
                 }
                 'DownArrow' {
                     $selectedButton = ($selectedButton + 1) % $script:Buttons.Count
-                    Draw-Remote -HighlightedButton $script:Buttons[$selectedButton].Id
+                    Show-Remote -HighlightedButton $script:Buttons[$selectedButton].Id
                 }
                 'LeftArrow' {
                     # Find button to the left
@@ -209,7 +207,7 @@ function Start-RemoteControl {
                     $leftButtons = $script:Buttons | Where-Object { $_.Y -eq $current.Y -and $_.X -lt $current.X } | Sort-Object X -Descending
                     if ($leftButtons) {
                         $selectedButton = $script:Buttons.IndexOf($leftButtons[0])
-                        Draw-Remote -HighlightedButton $script:Buttons[$selectedButton].Id
+                        Show-Remote -HighlightedButton $script:Buttons[$selectedButton].Id
                     }
                 }
                 'RightArrow' {
@@ -218,7 +216,7 @@ function Start-RemoteControl {
                     $rightButtons = $script:Buttons | Where-Object { $_.Y -eq $current.Y -and $_.X -gt $current.X } | Sort-Object X
                     if ($rightButtons) {
                         $selectedButton = $script:Buttons.IndexOf($rightButtons[0])
-                        Draw-Remote -HighlightedButton $script:Buttons[$selectedButton].Id
+                        Show-Remote -HighlightedButton $script:Buttons[$selectedButton].Id
                     }
                 }
                 'Enter' {
@@ -229,15 +227,15 @@ function Start-RemoteControl {
                     [Console]::ResetColor()
                     Send-RemoteKey -KeyCode $btn.KeyCode
                     Start-Sleep -Milliseconds 200
-                    Draw-Remote -HighlightedButton $btn.Id
+                    Show-Remote -HighlightedButton $btn.Id
                 }
-                'W' { Send-RemoteKey -KeyCode 'KEYCODE_DPAD_UP'; Draw-Remote }
-                'A' { Send-RemoteKey -KeyCode 'KEYCODE_DPAD_LEFT'; Draw-Remote }
-                'S' { Send-RemoteKey -KeyCode 'KEYCODE_DPAD_DOWN'; Draw-Remote }
-                'D' { Send-RemoteKey -KeyCode 'KEYCODE_DPAD_RIGHT'; Draw-Remote }
-                'H' { Send-RemoteKey -KeyCode 'KEYCODE_HOME'; Draw-Remote }
-                'B' { Send-RemoteKey -KeyCode 'KEYCODE_BACK'; Draw-Remote }
-                'Spacebar' { Send-RemoteKey -KeyCode 'KEYCODE_MEDIA_PLAY_PAUSE'; Draw-Remote }
+                'W' { Send-RemoteKey -KeyCode 'KEYCODE_DPAD_UP'; Show-Remote }
+                'A' { Send-RemoteKey -KeyCode 'KEYCODE_DPAD_LEFT'; Show-Remote }
+                'S' { Send-RemoteKey -KeyCode 'KEYCODE_DPAD_DOWN'; Show-Remote }
+                'D' { Send-RemoteKey -KeyCode 'KEYCODE_DPAD_RIGHT'; Show-Remote }
+                'H' { Send-RemoteKey -KeyCode 'KEYCODE_HOME'; Show-Remote }
+                'B' { Send-RemoteKey -KeyCode 'KEYCODE_BACK'; Show-Remote }
+                'Spacebar' { Send-RemoteKey -KeyCode 'KEYCODE_MEDIA_PLAY_PAUSE'; Show-Remote }
             }
         }
         
@@ -247,3 +245,4 @@ function Start-RemoteControl {
 
 # Start the remote
 Start-RemoteControl
+
