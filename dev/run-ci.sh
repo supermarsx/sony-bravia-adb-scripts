@@ -9,15 +9,15 @@ FAILED=false
 run_step() {
   local name="$1"
   local script="$2"
-  
+
   echo ""
   echo "================================================================================"
   echo "  ${name}"
   echo "================================================================================"
   echo ""
-  
+
   START=$(date +%s)
-  
+
   if bash "${script}"; then
     END=$(date +%s)
     DURATION=$((END - START))
@@ -53,7 +53,7 @@ if [ "${FAILED}" = false ]; then
   echo ""
   echo "PHASE 2: LINT CHECKS"
   echo ""
-  
+
   run_step "Lint Shell" "${DEV_DIR}/lint-shell.sh" || true
 fi
 
@@ -62,7 +62,7 @@ if [ "${FAILED}" = false ]; then
   echo ""
   echo "PHASE 3: TESTS"
   echo ""
-  
+
   run_step "Test Shell" "${DEV_DIR}/test-shell.sh" || true
 fi
 
@@ -85,7 +85,7 @@ if [ "${FAILED}" = true ]; then
 else
   echo "  ✓ SUCCESS - All checks passed!"
   echo ""
-  
+
   # Run PowerShell steps if pwsh is available
   if command -v pwsh &> /dev/null; then
     echo "  Running PowerShell checks..."
@@ -95,6 +95,6 @@ else
     echo "  ℹ Install PowerShell Core to run PowerShell checks"
     echo ""
   fi
-  
+
   exit 0
 fi

@@ -18,7 +18,7 @@
 BeforeAll {
     # Import the script under test (one level up from tests folder)
     $script:ScriptPath = Join-Path $PSScriptRoot '..' 'sony-bravia-scripts.ps1'
-    
+
     # Mock adb command globally to prevent actual execution
     Mock -CommandName 'Get-Command' -MockWith {
         return [PSCustomObject]@{
@@ -29,11 +29,11 @@ BeforeAll {
 
     # Create a test module from the script
     $scriptContent = Get-Content $script:ScriptPath -Raw
-    
+
     # Extract functions for testing (remove param block and try/catch wrapper)
     $functionsOnly = $scriptContent -replace '(?ms)^.*?(?=function Test-AdbAvailable)', '' `
         -replace '(?ms)^(try\s*\{.*?)(?=\}\s*catch)', '$1'
-    
+
     # Create temporary module
     $script:TestModule = New-Module -ScriptBlock ([scriptblock]::Create($functionsOnly)) -Name 'SonyBraviaScripts'
 }
@@ -100,7 +100,7 @@ Describe 'Helper Functions' {
     Context 'Read-NonEmpty' {
         It 'should return non-empty input' {
             Mock -CommandName 'Read-Host' -MockWith { 'test-input' } -ModuleName 'SonyBraviaScripts'
-            
+
             $result = & $script:TestModule { Read-NonEmpty -Prompt 'Test' }
             $result | Should -Be 'test-input'
         }
@@ -122,28 +122,28 @@ Describe 'Helper Functions' {
     Context 'Read-YesNo' {
         It 'should return true for "y"' {
             Mock -CommandName 'Read-Host' -MockWith { 'y' } -ModuleName 'SonyBraviaScripts'
-            
+
             $result = & $script:TestModule { Read-YesNo -Prompt 'Test' }
             $result | Should -Be $true
         }
 
         It 'should return true for "yes"' {
             Mock -CommandName 'Read-Host' -MockWith { 'YES' } -ModuleName 'SonyBraviaScripts'
-            
+
             $result = & $script:TestModule { Read-YesNo -Prompt 'Test' }
             $result | Should -Be $true
         }
 
         It 'should return false for "n"' {
             Mock -CommandName 'Read-Host' -MockWith { 'n' } -ModuleName 'SonyBraviaScripts'
-            
+
             $result = & $script:TestModule { Read-YesNo -Prompt 'Test' }
             $result | Should -Be $false
         }
 
         It 'should return false for "no"' {
             Mock -CommandName 'Read-Host' -MockWith { 'NO' } -ModuleName 'SonyBraviaScripts'
-            
+
             $result = & $script:TestModule { Read-YesNo -Prompt 'Test' }
             $result | Should -Be $false
         }
@@ -189,7 +189,7 @@ Describe 'Invoke-Adb Function' {
 
     It 'should include serial when provided' {
         $script:Serial = '192.168.1.100:5555'
-        
+
         Mock -CommandName 'adb' -MockWith {
             param($s, $serial, $cmd)
             $s | Should -Be '-s'
@@ -263,7 +263,7 @@ Describe 'Menu Structure' {
 Describe 'Action Functions' {
     BeforeAll {
         $scriptContent = Get-Content $script:ScriptPath -Raw
-        
+
         # Extract all action function names
         $script:ActionFunctions = [regex]::Matches($scriptContent, '(?m)^function ([a-z]\d+) \{') |
         ForEach-Object { $_.Groups[1].Value }
@@ -399,9 +399,9 @@ Describe 'Action Functions' {
 
         It 'should use Invoke-Adb for ADB commands' {
             # Most functions should use Invoke-Adb
-            $adbFunctions = @('a1', 'a2', 'a3', 'b1', 'b2', 'b3', 'c1', 'c2', 'c3', 'c4', 
+            $adbFunctions = @('a1', 'a2', 'a3', 'b1', 'b2', 'b3', 'c1', 'c2', 'c3', 'c4',
                 'd1', 'd2', 'd3', 'd4', 'd5', 'd6', 'd7', 'd8')
-            
+
             $adbFunctions | ForEach-Object {
                 $functionName = $_
                 if ($scriptContent -match "(?ms)function $functionName \{(.*?)(?=^function |\z)") {
@@ -641,12 +641,12 @@ Describe 'Code Quality' {
 Describe 'Integration Scenarios' {
     It 'should have all menu entries pointing to existing functions' {
         $scriptContent = Get-Content $script:ScriptPath -Raw
-        
+
         # Extract menu entries
         if ($scriptContent -match '(?ms)\$script:Menu\s*=\s*@\((.*?)\)') {
             $menuText = $Matches[1]
             $entries = [regex]::Matches($menuText, "@\('[^']+',\s*'[^']+',\s*'([^']+)'\)")
-            
+
             foreach ($entry in $entries) {
                 $funcName = $entry.Groups[1].Value
                 $scriptContent | Should -Match "(?m)^function $funcName \{"
@@ -793,10 +793,10 @@ Describe 'Action Function Behavior' {
     Context 'Input Validation Functions' {
         It 'functions requiring input should use Read-NonEmpty' {
             $scriptContent = Get-Content $script:ScriptPath -Raw
-            
+
             # Functions that need user input
-            @('a1', 'c4', 'f4', 'f5', 'f6', 'g3', 'h2', 'h6', 'h9', 'i4', 'i5', 
-                'i6', 'i8', 'i9', 'i10', 'i11', 'i12', 'j2', 'j3', 'j4', 'k2', 
+            @('a1', 'c4', 'f4', 'f5', 'f6', 'g3', 'h2', 'h6', 'h9', 'i4', 'i5',
+                'i6', 'i8', 'i9', 'i10', 'i11', 'i12', 'j2', 'j3', 'j4', 'k2',
                 'k5', 'l3', 'l4', 'm1') | ForEach-Object {
                 $funcName = $_
                 if ($scriptContent -match "(?ms)function $funcName \{(.*?)(?=^function |\z)") {
@@ -811,7 +811,7 @@ Describe 'Action Function Behavior' {
     Context 'AllowFailure Flag Usage' {
         It 'functions with potentially unsupported commands should use -AllowFailure' {
             $scriptContent = Get-Content $script:ScriptPath -Raw
-            
+
             # Functions that may not work on all devices
             @('c2', 'd6', 'd7', 'd8', 'e2', 'g4', 'l3', 'l4') | ForEach-Object {
                 $funcName = $_

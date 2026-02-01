@@ -30,9 +30,9 @@ log() {
     local message="$*"
     local timestamp
     timestamp=$(date '+%Y-%m-%d %H:%M:%S')
-    
+
     echo "[$timestamp] [$level] $message" >> "$LOG_FILE"
-    
+
     case "$level" in
         INFO)
             echo -e "${NC}$message${NC}"
@@ -65,16 +65,16 @@ detect_os() {
 
 install_adb_macos() {
     log INFO "Checking for ADB installation..."
-    
+
     if command_exists adb; then
         local adb_version
         adb_version=$(adb version | head -n1)
         log SUCCESS "ADB already installed: $adb_version"
         return 0
     fi
-    
+
     log WARNING "ADB not found."
-    
+
     # Check for Homebrew
     if command_exists brew; then
         log INFO "Installing ADB via Homebrew..."
@@ -87,18 +87,18 @@ install_adb_macos() {
     else
         log WARNING "Homebrew not found. Install from: https://brew.sh"
     fi
-    
+
     # Manual download
     log INFO "Downloading platform-tools from Google..."
     local download_url="https://dl.google.com/android/repository/platform-tools-latest-darwin.zip"
     local download_path="/tmp/platform-tools.zip"
     local extract_path="${INSTALL_PATH}/platform-tools"
-    
+
     if curl -L "$download_url" -o "$download_path"; then
         mkdir -p "$extract_path"
         if unzip -o "$download_path" -d "${INSTALL_PATH}"; then
             rm "$download_path"
-            
+
             # Add to PATH in shell profiles
             local shell_profile
             if [[ -n "${ZSH_VERSION:-}" ]] || [[ "$SHELL" == */zsh ]]; then
@@ -106,35 +106,35 @@ install_adb_macos() {
             else
                 shell_profile="${HOME}/.bashrc"
             fi
-            
+
             local path_export="export PATH=\"\$PATH:${extract_path}\""
             if ! grep -q "$extract_path" "$shell_profile" 2>/dev/null; then
                 echo "$path_export" >> "$shell_profile"
                 log INFO "Added platform-tools to PATH in $shell_profile"
             fi
-            
+
             export PATH="$PATH:${extract_path}"
             log SUCCESS "ADB installed successfully at: $extract_path"
             return 0
         fi
     fi
-    
+
     log ERROR "Failed to download/install ADB"
     return 1
 }
 
 install_adb_linux() {
     log INFO "Checking for ADB installation..."
-    
+
     if command_exists adb; then
         local adb_version
         adb_version=$(adb version | head -n1)
         log SUCCESS "ADB already installed: $adb_version"
         return 0
     fi
-    
+
     log WARNING "ADB not found."
-    
+
     # Detect package manager
     if command_exists apt-get; then
         log INFO "Installing ADB via apt..."
@@ -155,18 +155,18 @@ install_adb_linux() {
             return 0
         fi
     fi
-    
+
     # Manual download
     log INFO "Downloading platform-tools from Google..."
     local download_url="https://dl.google.com/android/repository/platform-tools-latest-linux.zip"
     local download_path="/tmp/platform-tools.zip"
     local extract_path="${INSTALL_PATH}/platform-tools"
-    
+
     if curl -L "$download_url" -o "$download_path"; then
         mkdir -p "$extract_path"
         if unzip -o "$download_path" -d "${INSTALL_PATH}"; then
             rm "$download_path"
-            
+
             # Add to PATH
             local shell_profile
             if [[ -n "${ZSH_VERSION:-}" ]] || [[ "$SHELL" == */zsh ]]; then
@@ -174,45 +174,45 @@ install_adb_linux() {
             else
                 shell_profile="${HOME}/.bashrc"
             fi
-            
+
             local path_export="export PATH=\"\$PATH:${extract_path}\""
             if ! grep -q "$extract_path" "$shell_profile" 2>/dev/null; then
                 echo "$path_export" >> "$shell_profile"
                 log INFO "Added platform-tools to PATH in $shell_profile"
             fi
-            
+
             export PATH="$PATH:${extract_path}"
             log SUCCESS "ADB installed successfully at: $extract_path"
             return 0
         fi
     fi
-    
+
     log ERROR "Failed to download/install ADB"
     return 1
 }
 
 install_pwsh() {
     log INFO "Checking PowerShell installation..."
-    
+
     if command_exists pwsh; then
         local pwsh_version
         pwsh_version=$(pwsh --version)
         log SUCCESS "PowerShell already installed: $pwsh_version"
         return 0
     fi
-    
+
     log WARNING "PowerShell not found."
     echo -n "Install PowerShell? (y/N): "
     read -r response
-    
+
     if [[ ! "$response" =~ ^[Yy]$ ]]; then
         log WARNING "Skipping PowerShell installation"
         return 1
     fi
-    
+
     local os_type
     os_type=$(detect_os)
-    
+
     if [[ "$os_type" == "macos" ]]; then
         if command_exists brew; then
             log INFO "Installing PowerShell via Homebrew..."
@@ -234,7 +234,7 @@ install_pwsh() {
             wget -q "https://packages.microsoft.com/config/ubuntu/$(lsb_release -rs)/packages-microsoft-prod.deb"
             sudo dpkg -i packages-microsoft-prod.deb
             rm packages-microsoft-prod.deb
-            
+
             sudo apt-get update
             if sudo apt-get install -y powershell; then
                 log SUCCESS "PowerShell installed successfully"
@@ -242,7 +242,7 @@ install_pwsh() {
             fi
         fi
     fi
-    
+
     log INFO "Please install PowerShell manually from:"
     log INFO "https://github.com/PowerShell/PowerShell"
     return 1
@@ -250,12 +250,12 @@ install_pwsh() {
 
 install_scripts() {
     log INFO "Installing Sony Bravia ADB Scripts..."
-    
+
     local script_dir
     script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    
+
     mkdir -p "$INSTALL_PATH"
-    
+
     # Copy main script
     if [[ -f "${script_dir}/sony-bravia-scripts.ps1" ]]; then
         cp "${script_dir}/sony-bravia-scripts.ps1" "$INSTALL_PATH/"
@@ -264,27 +264,27 @@ install_scripts() {
         log ERROR "Main script not found: ${script_dir}/sony-bravia-scripts.ps1"
         return 1
     fi
-    
+
     # Copy launcher
     if [[ -f "${script_dir}/sony-bravia-scripts.sh" ]]; then
         cp "${script_dir}/sony-bravia-scripts.sh" "$INSTALL_PATH/"
         chmod +x "${INSTALL_PATH}/sony-bravia-scripts.sh"
         log SUCCESS "Copied launcher to $INSTALL_PATH"
     fi
-    
+
     # Copy documentation
     if [[ -f "${script_dir}/readme.md" ]]; then
         cp "${script_dir}/readme.md" "$INSTALL_PATH/"
     fi
-    
+
     # Create symlink in PATH
     echo -n "Create symlink in ~/.local/bin? (Y/n): "
     read -r response
-    
+
     if [[ "$response" =~ ^[Yy]$ ]] || [[ -z "$response" ]]; then
         mkdir -p "${HOME}/.local/bin"
         ln -sf "${INSTALL_PATH}/sony-bravia-scripts.sh" "${HOME}/.local/bin/sony-bravia"
-        
+
         # Add to PATH if needed
         local shell_profile
         if [[ -n "${ZSH_VERSION:-}" ]] || [[ "$SHELL" == */zsh ]]; then
@@ -292,17 +292,17 @@ install_scripts() {
         else
             shell_profile="${HOME}/.bashrc"
         fi
-        
+
         local path_export="export PATH=\"\$PATH:\${HOME}/.local/bin\""
         if ! grep -q ".local/bin" "$shell_profile" 2>/dev/null; then
             echo "$path_export" >> "$shell_profile"
             log INFO "Added ~/.local/bin to PATH in $shell_profile"
         fi
-        
+
         export PATH="$PATH:${HOME}/.local/bin"
         log SUCCESS "Symlink created: sony-bravia"
     fi
-    
+
     return 0
 }
 

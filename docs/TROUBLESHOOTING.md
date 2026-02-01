@@ -53,7 +53,7 @@ This guide covers common issues and their solutions when using Sony Bravia ADB S
    ```bash
    # Windows
    netstat -ano | findstr :5555
-   
+
    # macOS/Linux
    lsof -i :5555
    ```
@@ -135,28 +135,28 @@ This guide covers common issues and their solutions when using Sony Bravia ADB S
    ```powershell
    # Windows
    .\install.ps1
-   
+
    # macOS/Linux
    ./install.sh
    ```
 
 2. **Manual installation**
-   
+
    **Windows (Chocolatey):**
    ```powershell
    choco install adb
    ```
-   
+
    **macOS (Homebrew):**
    ```bash
    brew install android-platform-tools
    ```
-   
+
    **Linux (Ubuntu/Debian):**
    ```bash
    sudo apt-get install adb
    ```
-   
+
    **Manual download:**
    - Download platform-tools from: https://developer.android.com/studio/releases/platform-tools
    - Extract and add to PATH
@@ -179,7 +179,7 @@ This guide covers common issues and their solutions when using Sony Bravia ADB S
    ```bash
    # Check current version
    adb version
-   
+
    # Update via package manager
    brew upgrade android-platform-tools  # macOS
    choco upgrade adb                    # Windows
@@ -206,7 +206,7 @@ This guide covers common issues and their solutions when using Sony Bravia ADB S
    # Windows
    netstat -ano | findstr :5037
    taskkill /PID <pid> /F
-   
+
    # macOS/Linux
    lsof -t -i :5037 | xargs kill -9
    ```
@@ -231,7 +231,7 @@ This guide covers common issues and their solutions when using Sony Bravia ADB S
    ```cmd
    # Windows
    sony-bravia-scripts.cmd
-   
+
    # macOS/Linux
    ./sony-bravia-scripts.sh
    ```
@@ -260,10 +260,10 @@ This guide covers common issues and their solutions when using Sony Bravia ADB S
    ```powershell
    # Windows
    winget install Microsoft.PowerShell
-   
+
    # macOS
    brew install --cask powershell
-   
+
    # Linux
    sudo snap install powershell --classic
    ```
@@ -570,14 +570,14 @@ If you're still experiencing issues:
    ```bash
    # ADB version
    adb version
-   
+
    # PowerShell version
    pwsh --version
-   
+
    # TV info
    adb shell getprop ro.build.version.release
    adb shell getprop ro.product.model
-   
+
    # Connection status
    adb devices -l
    ```
@@ -602,5 +602,5 @@ If you're still experiencing issues:
 
 ---
 
-**Last Updated:** December 2024  
+**Last Updated:** December 2024
 **Version:** 2.0

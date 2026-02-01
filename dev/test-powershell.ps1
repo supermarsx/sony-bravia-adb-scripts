@@ -62,7 +62,7 @@ Write-Host ""
 
 try {
     $result = Invoke-Pester -Configuration $config
-    
+
     Write-Host ""
     Write-Host "=== Test Summary ===" -ForegroundColor Cyan
     Write-Host "Total: $($result.TotalCount)" -ForegroundColor Gray
@@ -70,21 +70,21 @@ try {
     Write-Host "Failed: $($result.FailedCount)" -ForegroundColor $(if ($result.FailedCount -gt 0) { 'Red' } else { 'Green' })
     Write-Host "Skipped: $($result.SkippedCount)" -ForegroundColor Yellow
     Write-Host ""
-    
+
     if ($result.FailedCount -gt 0) {
         Write-Host "✗ Tests failed" -ForegroundColor Red
         Write-Host ""
         exit 1
     }
-    
+
     Write-Host "✓ All tests passed" -ForegroundColor Green
     Write-Host ""
-    
+
     if ($CodeCoverage -and $result.CodeCoverage) {
         Write-Host "Code Coverage: $($result.CodeCoverage.CoveragePercent)%" -ForegroundColor Cyan
         Write-Host ""
     }
-    
+
     exit 0
 }
 catch {

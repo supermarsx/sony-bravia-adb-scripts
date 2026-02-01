@@ -430,10 +430,10 @@ function Navigate-TvMenu {
         [string[]]$Path,
         [int]$DelayMs = 300
     )
-    
+
     sony-bravia-scripts.ps1 -Action a1 -Quiet  # Home
     Start-Sleep -Milliseconds $DelayMs
-    
+
     foreach ($step in $Path) {
         sony-bravia-scripts.ps1 -Action $step -Quiet
         Start-Sleep -Milliseconds $DelayMs
@@ -507,12 +507,12 @@ Import-Module Pode
 
 Start-PodeServer {
     Add-PodeEndpoint -Address localhost -Port 8080 -Protocol Http
-    
+
     Add-PodeRoute -Method Get -Path '/tv/:action' -ScriptBlock {
         param($WebEvent)
-        
+
         $action = $WebEvent.Parameters['action']
-        
+
         try {
             sony-bravia-scripts.ps1 -Action $action -Quiet
             Write-PodeJsonResponse -Value @{ success = $true; action = $action }
@@ -542,9 +542,9 @@ $recognizer.SetInputToDefaultAudioDevice()
 
 $recognizer.add_SpeechRecognized({
     param($sender, $e)
-    
+
     $text = $e.Result.Text.ToLower()
-    
+
     switch -Wildcard ($text) {
         "*home*" { sony-bravia-scripts.ps1 -Action a1 -Quiet }
         "*back*" { sony-bravia-scripts.ps1 -Action a2 -Quiet }
@@ -568,17 +568,17 @@ Write-Host "Voice control active. Say commands..."
 # Monitor TV connectivity
 while ($true) {
     $connected = Test-AdbConnection
-    
+
     if (-not $connected) {
         Write-Warning "TV disconnected at $(Get-Date)"
-        
+
         # Send notification (requires notification tool)
         # Send-Notification -Title "TV Offline" -Message "Sony Bravia disconnected"
-        
+
         # Attempt reconnect
         adb connect 192.168.1.100:5555
     }
-    
+
     Start-Sleep -Seconds 60
 }
 ```
@@ -634,7 +634,7 @@ function tv-youtube { sony-bravia-scripts.ps1 -Action g5 -Quiet }
 
 ---
 
-**Last Updated:** December 2024  
+**Last Updated:** December 2024
 **Version:** 2.0
 
 See also:

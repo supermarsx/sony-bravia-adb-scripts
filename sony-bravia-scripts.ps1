@@ -90,7 +90,7 @@ function Initialize-Config {
     if (-not (Test-Path $script:ConfigDir)) {
         New-Item -ItemType Directory -Path $script:ConfigDir -Force | Out-Null
     }
-    
+
     if (-not (Test-Path $script:ConfigFile)) {
         $defaultConfig = @{
             version                     = $script:ScriptVer
@@ -115,11 +115,11 @@ function Set-ConfigValue {
     param(
         [Parameter(Mandatory)]
         [string]$Key,
-        
+
         [Parameter(Mandatory)]
         $Value
     )
-    
+
     $config = Get-Config
     if ($config) {
         $config.$Key = $Value
@@ -131,19 +131,19 @@ function Add-ToHistory {
     param(
         [Parameter(Mandatory)]
         [string]$Action,
-        
+
         [string]$Serial,
-        
+
         [bool]$Success,
-        
+
         [string]$ErrorMessage
     )
-    
+
     $history = @()
     if (Test-Path $script:HistoryFile) {
         $history = Get-Content $script:HistoryFile | ConvertFrom-Json
     }
-    
+
     $entry = @{
         timestamp = (Get-Date).ToString('o')
         action    = $Action
@@ -151,14 +151,14 @@ function Add-ToHistory {
         success   = $Success
         error     = $ErrorMessage
     }
-    
+
     $history = @($entry) + $history | Select-Object -First $script:MaxHistoryItems
     $history | ConvertTo-Json | Set-Content $script:HistoryFile
 }
 
 function Get-History {
     param([int]$Last = 10)
-    
+
     if (Test-Path $script:HistoryFile) {
         $history = Get-Content $script:HistoryFile | ConvertFrom-Json
         return $history | Select-Object -First $Last
@@ -170,31 +170,31 @@ function Write-Log {
     param(
         [Parameter(Mandatory)]
         [string]$Message,
-        
+
         [ValidateSet('Info', 'Warning', 'Error', 'Verbose')]
         [string]$Level = 'Info'
     )
-    
+
     if ($script:QuietMode -and $Level -ne 'Error') {
         return
     }
-    
+
     if ($Level -eq 'Verbose' -and -not $script:VerboseLogging) {
         return
     }
-    
+
     if ($script:OutputFormat -eq 'JSON' -or $script:OutputFormat -eq 'CSV') {
         # Don't write logs in structured formats, collect for final output
         return
     }
-    
+
     $color = switch ($Level) {
         'Info' { 'Gray' }
         'Warning' { 'Yellow' }
         'Error' { 'Red' }
         'Verbose' { 'DarkGray' }
     }
-    
+
     Write-Host $Message -ForegroundColor $color
 }
 
@@ -203,15 +203,15 @@ function Test-AdbConnection {
         [int]$RetryCount = 3,
         [int]$RetryDelayMs = 1000
     )
-    
+
     Write-Log "Checking ADB connection..." -Level Verbose
-    
+
     for ($i = 0; $i -lt $RetryCount; $i++) {
         try {
             $devices = & adb devices 2>&1
             if ($LASTEXITCODE -eq 0) {
                 $deviceLines = $devices | Where-Object { $_ -match '\t(device|offline|unauthorized)' }
-                
+
                 if ($deviceLines) {
                     Write-Log "ADB connection verified ($($deviceLines.Count) device(s) found)" -Level Verbose
                     return $true
@@ -221,13 +221,13 @@ function Test-AdbConnection {
         catch {
             Write-Log "Connection check attempt $($i + 1) failed: $($_.Exception.Message)" -Level Verbose
         }
-        
+
         if ($i -lt $RetryCount - 1) {
             Write-Log "Retrying in $($RetryDelayMs)ms..." -Level Verbose
             Start-Sleep -Milliseconds $RetryDelayMs
         }
     }
-    
+
     Write-Log "No ADB devices found. Make sure your device is connected and ADB is enabled." -Level Warning
     return $false
 }
@@ -286,9 +286,9 @@ function Invoke-Adb {
 
         try {
             if (-not $script:QuietMode -and $script:OutputFormat -eq 'Text') {
-                Write-Host "" 
+                Write-Host ""
                 Write-Host "Executing: adb $($fullArgs -join ' ')" -ForegroundColor DarkGray
-                Write-Host "" 
+                Write-Host ""
             }
 
             $output = & adb @fullArgs 2>&1
@@ -300,14 +300,14 @@ function Invoke-Adb {
 
             if (-not $AllowFailure -and $exit -ne 0) {
                 $errorMsg = $output -join "`n"
-                
+
                 # Check for common errors that might benefit from retry
                 if ($errorMsg -match 'device offline|device not found|no devices|protocol fault') {
                     $lastError = "ADB connection error: $errorMsg"
                     $attempt++
                     continue
                 }
-                
+
                 throw "adb exited with code $exit: $errorMsg"
             }
 
@@ -319,7 +319,7 @@ function Invoke-Adb {
         }
         catch {
             $lastError = $_.Exception.Message
-            
+
             if ($attempt -ge $RetryCount) {
                 if ($AllowFailure) {
                     return [pscustomobject]@{
@@ -330,7 +330,7 @@ function Invoke-Adb {
                 }
                 throw
             }
-            
+
             $attempt++
         }
     }
@@ -351,7 +351,7 @@ function Invoke-Adb {
 
 function Wait-ForContinue {
     param([string]$Message = 'Press any key to continue...')
-    Write-Host "" 
+    Write-Host ""
     $null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
 }
 
@@ -385,15 +385,15 @@ function Read-YesNo {
 function Write-Title {
     param([Parameter(Mandatory)][string]$Text)
     $Host.UI.RawUI.WindowTitle = "Sony Bravia Scripts $script:ScriptVer - $Text"
-    Write-Host "" 
+    Write-Host ""
     Write-Host $Text -ForegroundColor Cyan
-    Write-Host "" 
+    Write-Host ""
 }
 
 function Done {
-    Write-Host "" 
+    Write-Host ""
     Write-Host "Finished executing." -ForegroundColor Green
-    Write-Host "" 
+    Write-Host ""
     Pause-Continue
 }
 
@@ -723,60 +723,60 @@ function i3 {
 
 function i3a {
     Write-Title "Clear cache for all apps (loop)"
-    
+
     Write-Host "Fetching installed packages..." -ForegroundColor Yellow
     $packagesOutput = Invoke-Adb -Args @('shell', 'pm list packages') -AllowFailure
-    
+
     if (-not $packagesOutput -or $packagesOutput.ExitCode -ne 0) {
         Write-Host "Failed to retrieve packages" -ForegroundColor Red
         Done
         return
     }
-    
+
     # Parse package names from output (format: "package:com.example.app")
     $packages = $packagesOutput.Output -split "`n" | Where-Object { $_ -match '^package:' } | ForEach-Object {
         $_.Replace('package:', '').Trim()
     } | Where-Object { $_ }
-    
+
     if ($packages.Count -eq 0) {
         Write-Host "No packages found" -ForegroundColor Red
         Done
         return
     }
-    
+
     Write-Host "Found $($packages.Count) packages" -ForegroundColor Green
     Write-Host ""
-    
+
     $confirm = Read-YesNo "Clear cache for all $($packages.Count) packages? (may take several minutes)"
     if (-not $confirm) {
         Write-Host "Cache clear cancelled" -ForegroundColor Yellow
         Done
         return
     }
-    
+
     Write-Host ""
     Write-Host "Clearing cache for all packages..." -ForegroundColor Yellow
     Write-Host "(This may take a while, please wait...)" -ForegroundColor Gray
     Write-Host ""
-    
+
     $successCount = 0
     $failCount = 0
     $current = 0
-    
+
     foreach ($pkg in $packages) {
         $current++
         $percentage = [math]::Round(($current / $packages.Count) * 100)
-        
+
         # Show progress every 10 packages or always in verbose mode
         if (($current % 10 -eq 0) -or $current -eq 1 -or $current -eq $packages.Count -or $script:VerboseMode) {
             Write-Host "[$percentage%] Processing $current/$($packages.Count): $pkg" -ForegroundColor Gray
         }
-        
+
         try {
             # Use pm clear which properly clears cache and data
             # With -AllowFailure to not break on system packages that can't be cleared
             $result = Invoke-Adb -Args @('shell', "pm clear $pkg 2>/dev/null || echo 'skip'") -AllowFailure
-            
+
             if ($result.Output -notmatch 'Failed|failed|error') {
                 $successCount++
             }
@@ -788,7 +788,7 @@ function i3a {
             $failCount++
         }
     }
-    
+
     Write-Host ""
     Write-Host "Cache clear complete!" -ForegroundColor Green
     Write-Host "  Cleared: $successCount packages" -ForegroundColor Green
@@ -910,7 +910,7 @@ function j4 {
 
 function i13 {
     Write-Title "Debloat: Disable Sony bloatware (preset)"
-    
+
     $bloatwarePackages = @(
         'com.gameloft.android.HEP.GloftANHP',
         'com.google.android.inputmethod.japanese',
@@ -953,13 +953,13 @@ function i13 {
         'com.sonyericsson.dlna.dtcpplayer',
         'tv.samba.ssm'
     )
-    
+
     $confirm = Read-YesNo "Disable $($bloatwarePackages.Count) bloatware packages? (recommended)"
     if ($confirm) {
         Write-Host "Disabling bloatware packages..." -ForegroundColor Yellow
         $successCount = 0
         $failCount = 0
-        
+
         foreach ($pkg in $bloatwarePackages) {
             Write-Host "  Disabling: $pkg" -ForegroundColor Gray
             try {
@@ -970,7 +970,7 @@ function i13 {
                 $failCount++
             }
         }
-        
+
         Write-Host ""
         Write-Host "Debloat complete!" -ForegroundColor Green
         Write-Host "  Disabled: $successCount packages" -ForegroundColor Green
@@ -986,7 +986,7 @@ function i13 {
 
 function i14 {
     Write-Title "Debloat: Re-enable Sony packages (undo)"
-    
+
     $bloatwarePackages = @(
         'com.gameloft.android.HEP.GloftANHP',
         'com.google.android.inputmethod.japanese',
@@ -1029,13 +1029,13 @@ function i14 {
         'com.sonyericsson.dlna.dtcpplayer',
         'tv.samba.ssm'
     )
-    
+
     $confirm = Read-YesNo "Re-enable $($bloatwarePackages.Count) packages?"
     if ($confirm) {
         Write-Host "Re-enabling packages..." -ForegroundColor Yellow
         $successCount = 0
         $failCount = 0
-        
+
         foreach ($pkg in $bloatwarePackages) {
             Write-Host "  Enabling: $pkg" -ForegroundColor Gray
             try {
@@ -1047,7 +1047,7 @@ function i14 {
                 $failCount++
             }
         }
-        
+
         Write-Host ""
         Write-Host "Re-enable complete!" -ForegroundColor Green
         Write-Host "  Enabled: $successCount packages" -ForegroundColor Green
@@ -1063,7 +1063,7 @@ function i14 {
 
 function i15 {
     Write-Title "Debloat: NUCLEAR - Disable all bloatware (aggressive)"
-    
+
     $nuclearPackages = @(
         'pt.dreamia.pandaplus',
         'com.uei.quicksetsdk.sony',
@@ -1184,7 +1184,7 @@ function i15 {
         'com.sony.dtv.discovery',
         'com.sony.huey.dlna.module'
     )
-    
+
     Write-Host ""
     Write-Host "⚠️  WARNING: NUCLEAR DEBLOAT ⚠️" -ForegroundColor Red
     Write-Host "This will disable $($nuclearPackages.Count) packages including:" -ForegroundColor Yellow
@@ -1195,14 +1195,14 @@ function i15 {
     Write-Host ""
     Write-Host "This may break TV functionality! Use with caution." -ForegroundColor Red
     Write-Host ""
-    
+
     $confirm = Read-YesNo "Proceed with NUCLEAR debloat?"
     if ($confirm) {
         Write-Host ""
         Write-Host "Starting nuclear debloat..." -ForegroundColor Yellow
         $successCount = 0
         $failCount = 0
-        
+
         foreach ($pkg in $nuclearPackages) {
             Write-Host "  Disabling: $pkg" -ForegroundColor Gray
             try {
@@ -1213,7 +1213,7 @@ function i15 {
                 $failCount++
             }
         }
-        
+
         Write-Host ""
         Write-Host "Nuclear debloat complete!" -ForegroundColor Green
         Write-Host "  Disabled: $successCount packages" -ForegroundColor Green
@@ -1231,7 +1231,7 @@ function i15 {
 
 function i16 {
     Write-Title "Debloat: Re-enable all packages (undo nuclear)"
-    
+
     $nuclearPackages = @(
         'pt.dreamia.pandaplus',
         'com.uei.quicksetsdk.sony',
@@ -1352,18 +1352,18 @@ function i16 {
         'com.sony.dtv.discovery',
         'com.sony.huey.dlna.module'
     )
-    
+
     Write-Host ""
     Write-Host "This will re-enable $($nuclearPackages.Count) packages" -ForegroundColor Yellow
     Write-Host ""
-    
+
     $confirm = Read-YesNo "Re-enable all packages?"
     if ($confirm) {
         Write-Host ""
         Write-Host "Re-enabling packages..." -ForegroundColor Yellow
         $successCount = 0
         $failCount = 0
-        
+
         foreach ($pkg in $nuclearPackages) {
             Write-Host "  Enabling: $pkg" -ForegroundColor Gray
             try {
@@ -1375,7 +1375,7 @@ function i16 {
                 $failCount++
             }
         }
-        
+
         Write-Host ""
         Write-Host "Re-enable complete!" -ForegroundColor Green
         Write-Host "  Enabled: $successCount packages" -ForegroundColor Green
@@ -1493,7 +1493,7 @@ function l6 {
 function m1 {
     Write-Title "Print custom text"
     $text = Read-NonEmpty "Text"
-    Write-Host "" 
+    Write-Host ""
     Write-Host $text
     Done
 }
@@ -1648,7 +1648,7 @@ function Invoke-Action {
 
     if (-not $script:ActionMap.ContainsKey($key)) {
         if (-not $Quiet) {
-            Write-Host "" 
+            Write-Host ""
             Write-Host "Selected option '$Id' isn't valid. Please try again." -ForegroundColor Yellow
             Start-Sleep -Seconds 1
         }
@@ -1657,7 +1657,7 @@ function Invoke-Action {
 
     $fn = $script:ActionMap[$key]
     if (-not $Quiet) {
-        Write-Host "" 
+        Write-Host ""
         Write-Host "Selected option $Id." -ForegroundColor DarkGray
         Start-Sleep -Milliseconds 300
     }
@@ -2051,32 +2051,32 @@ function Start-Tui {
 try {
     # Initialize configuration and history
     Initialize-Config
-    
+
     # Load configuration
     $config = Get-Config
-    
+
     # Use default serial from config if not specified
     if (-not $Serial -and $config -and $config.defaultSerial) {
         $Serial = $config.defaultSerial
         Write-Log "Using default serial from config: $Serial" -Level Verbose
     }
-    
+
     # Check connection if requested or configured
     if ($CheckConnection -or ($config -and $config.checkConnectionBeforeAction)) {
         if (-not (Test-AdbConnection)) {
             Write-Log "Warning: No ADB connection detected. Some operations may fail." -Level Warning
         }
     }
-    
+
     # Batch mode from file
     if ($Batch) {
         if (-not (Test-Path $Batch)) {
             throw "Batch file not found: $Batch"
         }
-        
+
         $actions = Get-Content $Batch | Where-Object { $_ -and $_ -notmatch '^\s*#' }
         Write-Log "Processing $($actions.Count) actions from batch file..." -Level Info
-        
+
         $results = @()
         foreach ($batchAction in $actions) {
             try {
@@ -2099,7 +2099,7 @@ try {
                 Write-Log "Error executing $batchAction : $($_.Exception.Message)" -Level Error
             }
         }
-        
+
         # Output results
         if ($OutputFormat -eq 'JSON') {
             $results | ConvertTo-Json
@@ -2111,16 +2111,16 @@ try {
             Write-Host "`nBatch Summary:" -ForegroundColor Cyan
             $results | Format-Table -AutoSize
         }
-        
+
         $failedCount = ($results | Where-Object { -not $_.Success }).Count
         exit $(if ($failedCount -gt 0) { 1 } else { 0 })
     }
-    
+
     # Comma-separated batch mode
     if ($Action -and $Action.Contains(',')) {
         $actions = $Action -split ',' | ForEach-Object { $_.Trim() }
         Write-Log "Processing $($actions.Count) actions in batch mode..." -Level Info
-        
+
         $results = @()
         foreach ($batchAction in $actions) {
             try {
@@ -2143,7 +2143,7 @@ try {
                 Write-Log "Error executing $batchAction : $($_.Exception.Message)" -Level Error
             }
         }
-        
+
         # Output results
         if ($OutputFormat -eq 'JSON') {
             $results | ConvertTo-Json
@@ -2155,11 +2155,11 @@ try {
             Write-Host "`nBatch Summary:" -ForegroundColor Cyan
             $results | Format-Table -AutoSize
         }
-        
+
         $failedCount = ($results | Where-Object { -not $_.Success }).Count
         exit $(if ($failedCount -gt 0) { 1 } else { 0 })
     }
-    
+
     # Single action mode
     if ($Action) {
         try {
@@ -2185,9 +2185,9 @@ catch {
         } | ConvertTo-Json
     }
     else {
-        Write-Host "" 
+        Write-Host ""
         Write-Host "ERROR: $($_.Exception.Message)" -ForegroundColor Red
-        Write-Host "" 
+        Write-Host ""
         if (-not $script:QuietMode) {
             Write-Host "Troubleshooting tips:" -ForegroundColor Yellow
             Write-Host "  1. Verify ADB is installed and in PATH: adb version" -ForegroundColor Gray

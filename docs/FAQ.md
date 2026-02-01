@@ -497,7 +497,7 @@ This script provides a convenient middle ground with automation and scripting ca
 
 ---
 
-**Last Updated:** December 2024  
+**Last Updated:** December 2024
 **Version:** 2.0
 
 **Still have questions?**

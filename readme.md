@@ -89,7 +89,7 @@
 
 ## 📋 Requirements
 
-- **PowerShell**: 
+- **PowerShell**:
   - Windows: PowerShell 5.1+ (built-in) or PowerShell 7+
   - macOS: PowerShell Core 7+ (`brew install --cask powershell`)
   - Linux: PowerShell Core 7+ ([install guide](https://docs.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-linux))
@@ -298,7 +298,7 @@ Store connection details and preferences:
 #### Interactive Remote ([sony-bravia-remote.ps1](sony-bravia-remote.ps1))
 - **Mouse**: Click any button
 - **Arrow Keys**: Navigate between buttons
-- **Enter**: Activate selected button  
+- **Enter**: Activate selected button
 - **WASD**: D-pad navigation
 - **H**: Home, **B**: Back, **Space**: Play/Pause
 - **Q/Esc**: Quit

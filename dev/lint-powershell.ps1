@@ -36,18 +36,18 @@ $results = Invoke-ScriptAnalyzer -Path $scriptRoot -Recurse -Settings $settingsP
 if ($results) {
     Write-Host ""
     $results | Format-Table -AutoSize
-    
+
     $errorCount = ($results | Where-Object { $_.Severity -eq 'Error' }).Count
     $warningCount = ($results | Where-Object { $_.Severity -eq 'Warning' }).Count
     $infoCount = ($results | Where-Object { $_.Severity -eq 'Information' }).Count
-    
+
     Write-Host ""
     Write-Host "=== Summary ===" -ForegroundColor Cyan
     Write-Host "Errors: $errorCount" -ForegroundColor $(if ($errorCount -gt 0) { 'Red' } else { 'Green' })
     Write-Host "Warnings: $warningCount" -ForegroundColor $(if ($warningCount -gt 0) { 'Yellow' } else { 'Green' })
     Write-Host "Information: $infoCount" -ForegroundColor Gray
     Write-Host ""
-    
+
     if ($errorCount -gt 0) {
         Write-Host "✗ PSScriptAnalyzer found $errorCount error(s)" -ForegroundColor Red
         Write-Host ""

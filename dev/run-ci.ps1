@@ -8,7 +8,7 @@
   2. Lint checks (PowerShell and Shell)
   3. Tests (PowerShell and Shell)
   4. Package (if all checks pass)
-  
+
   This mimics the GitHub Actions CI pipeline.
 #>
 
@@ -42,15 +42,15 @@ function Invoke-Step {
         [string]$Script,
         [switch]$IsShell
     )
-    
+
     Write-Host ""
     Write-Host ("=" * 80) -ForegroundColor DarkGray
     Write-Host "  $Name" -ForegroundColor Cyan
     Write-Host ("=" * 80) -ForegroundColor DarkGray
     Write-Host ""
-    
+
     $startTime = Get-Date
-    
+
     try {
         if ($IsShell) {
             # Run shell script
@@ -64,13 +64,13 @@ function Invoke-Step {
             # Run PowerShell script
             & $Script
         }
-        
+
         $exitCode = $LASTEXITCODE
         $duration = (Get-Date) - $startTime
-        
+
         Write-Host ""
         Write-Host "  Completed in $($duration.TotalSeconds.ToString('0.00'))s" -ForegroundColor Gray
-        
+
         if ($exitCode -eq 0) {
             return $true
         }
@@ -101,9 +101,9 @@ $startTotal = Get-Date
 if (-not $SkipFormat) {
     Write-Host "PHASE 1: FORMAT CHECKS" -ForegroundColor Magenta
     Write-Host ""
-    
+
     $formatPs = Invoke-Step -Name "Format PowerShell" -Script (Join-Path $devPath "format-powershell.ps1")
-    
+
     if (-not $Fast) {
         $formatSh = Invoke-Step -Name "Format Shell" -Script (Join-Path $devPath "format-shell.sh") -IsShell
     }
@@ -117,9 +117,9 @@ if (-not $SkipLint -and -not $failed) {
     Write-Host ""
     Write-Host "PHASE 2: LINT CHECKS" -ForegroundColor Magenta
     Write-Host ""
-    
+
     $lintPs = Invoke-Step -Name "Lint PowerShell" -Script (Join-Path $devPath "lint-powershell.ps1")
-    
+
     if (-not $Fast) {
         $lintSh = Invoke-Step -Name "Lint Shell" -Script (Join-Path $devPath "lint-shell.sh") -IsShell
     }
@@ -136,9 +136,9 @@ if (-not $SkipTests -and -not $failed) {
     Write-Host ""
     Write-Host "PHASE 3: TESTS" -ForegroundColor Magenta
     Write-Host ""
-    
+
     $testPs = Invoke-Step -Name "Test PowerShell" -Script (Join-Path $devPath "test-powershell.ps1")
-    
+
     if (-not $Fast) {
         $testSh = Invoke-Step -Name "Test Shell" -Script (Join-Path $devPath "test-shell.sh") -IsShell
     }
@@ -155,7 +155,7 @@ if (-not $SkipPackage -and -not $failed) {
     Write-Host ""
     Write-Host "PHASE 4: PACKAGE" -ForegroundColor Magenta
     Write-Host ""
-    
+
     $package = Invoke-Step -Name "Create Packages" -Script (Join-Path $devPath "package.ps1")
 }
 else {

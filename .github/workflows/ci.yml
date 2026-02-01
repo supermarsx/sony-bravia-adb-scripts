@@ -128,11 +128,11 @@ jobs:
             $results | Format-Table -AutoSize
             $errorCount = ($results | Where-Object { $_.Severity -eq 'Error' }).Count
             $warningCount = ($results | Where-Object { $_.Severity -eq 'Warning' }).Count
-            
+
             Write-Host "`n=== Summary ===" -ForegroundColor Cyan
             Write-Host "Errors: $errorCount" -ForegroundColor $(if ($errorCount -gt 0) { 'Red' } else { 'Green' })
             Write-Host "Warnings: $warningCount" -ForegroundColor $(if ($warningCount -gt 0) { 'Yellow' } else { 'Green' })
-            
+
             if ($errorCount -gt 0) {
               Write-Error "PSScriptAnalyzer found $errorCount error(s)"
               exit 1
@@ -167,7 +167,7 @@ jobs:
 
       - name: Run shellcheck
         run: |
-          echo "=== Running ShellCheck ===" 
+          echo "=== Running ShellCheck ==="
 
           EXIT_CODE=0
           shellcheck -x sony-bravia-scripts.sh || EXIT_CODE=$?
@@ -459,7 +459,7 @@ jobs:
 
           ---
 
-          **Build:** [#${GITHUB_RUN_NUMBER}](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})  
+          **Build:** [#${GITHUB_RUN_NUMBER}](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})
           **Built:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')
           EOF
 

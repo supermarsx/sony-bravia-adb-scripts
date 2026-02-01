@@ -13,11 +13,11 @@ class SonyBraviaScripts < Formula
     # Install main script and launcher
     libexec.install "sony-bravia-scripts.ps1"
     libexec.install "sony-bravia-scripts.sh"
-    
+
     # Install documentation
     doc.install "readme.md" if File.exist?("readme.md")
     doc.install "license.md" if File.exist?("license.md")
-    
+
     # Create wrapper script in bin
     (bin/"sony-bravia").write <<~EOS
       #!/bin/bash

@@ -26,7 +26,7 @@ if (Test-Path $mainScript) {
 
 function Send-RemoteKey {
     param([string]$KeyCode)
-    
+
     $args = @('shell', 'input', 'keyevent', $KeyCode)
     if ($Serial) {
         Invoke-Adb -Serial $Serial -Args $args -AllowFailure | Out-Null
@@ -45,30 +45,30 @@ function Show-Button {
         [ConsoleColor]$Color = 'White',
         [bool]$IsHighlighted = $false
     )
-    
+
     $bg = if ($IsHighlighted) { [ConsoleColor]::DarkBlue } else { [ConsoleColor]::Black }
     $fg = if ($IsHighlighted) { [ConsoleColor]::Yellow } else { $Color }
-    
+
     [Console]::SetCursorPosition($X, $Y)
     [Console]::BackgroundColor = $bg
     [Console]::ForegroundColor = $fg
-    
+
     $topBottom = "┌" + ("─" * ($Width - 2)) + "┐"
     $middle = "│" + $Label.PadLeft(($Width - 2 + $Label.Length) / 2).PadRight($Width - 2) + "│"
     $bottom = "└" + ("─" * ($Width - 2)) + "┘"
-    
+
     [Console]::WriteLine($topBottom)
     [Console]::SetCursorPosition($X, $Y + 1)
     [Console]::WriteLine($middle)
     [Console]::SetCursorPosition($X, $Y + 2)
     [Console]::WriteLine($bottom)
-    
+
     [Console]::ResetColor()
 }
 
 function Get-ButtonAtPosition {
     param([int]$X, [int]$Y)
-    
+
     foreach ($btn in $script:Buttons) {
         if ($X -ge $btn.X -and $X -lt ($btn.X + $btn.Width) -and
             $Y -ge $btn.Y -and $Y -lt ($btn.Y + 3)) {
@@ -80,10 +80,10 @@ function Get-ButtonAtPosition {
 
 function Show-Remote {
     param([string]$HighlightedButton = $null)
-    
+
     [Console]::Clear()
     [Console]::CursorVisible = $false
-    
+
     # Title
     [Console]::SetCursorPosition(0, 0)
     [Console]::ForegroundColor = [ConsoleColor]::Cyan
@@ -91,13 +91,13 @@ function Show-Remote {
     [Console]::WriteLine(" ║   Sony Bravia TV Remote Control     ║")
     [Console]::WriteLine(" ╚══════════════════════════════════════╝")
     [Console]::ResetColor()
-    
+
     # Draw all buttons
     foreach ($btn in $script:Buttons) {
         $isHighlighted = ($btn.Id -eq $HighlightedButton)
         Show-Button -X $btn.X -Y $btn.Y -Label $btn.Label -Width $btn.Width -Color $btn.Color -IsHighlighted $isHighlighted
     }
-    
+
     # Instructions
     [Console]::SetCursorPosition(0, 35)
     [Console]::ForegroundColor = [ConsoleColor]::DarkGray
@@ -112,28 +112,28 @@ $script:Buttons = @(
     @{ Id = 'POWER'; Label = '⏻ Power'; X = 2; Y = 4; Width = 12; Color = 'Red'; KeyCode = 'KEYCODE_POWER' }
     @{ Id = 'INPUT'; Label = '⎙ Input'; X = 16; Y = 4; Width = 12; Color = 'Yellow'; KeyCode = 'KEYCODE_TV_INPUT' }
     @{ Id = 'MENU'; Label = '☰ Menu'; X = 30; Y = 4; Width = 12; Color = 'Yellow'; KeyCode = 'KEYCODE_MENU' }
-    
+
     # D-Pad
     @{ Id = 'UP'; Label = '▲ Up'; X = 16; Y = 8; Width = 12; Color = 'White'; KeyCode = 'KEYCODE_DPAD_UP' }
     @{ Id = 'LEFT'; Label = '◄ Left'; X = 2; Y = 11; Width = 12; Color = 'White'; KeyCode = 'KEYCODE_DPAD_LEFT' }
     @{ Id = 'OK'; Label = '● OK'; X = 16; Y = 11; Width = 12; Color = 'Green'; KeyCode = 'KEYCODE_DPAD_CENTER' }
     @{ Id = 'RIGHT'; Label = 'Right ►'; X = 30; Y = 11; Width = 12; Color = 'White'; KeyCode = 'KEYCODE_DPAD_RIGHT' }
     @{ Id = 'DOWN'; Label = '▼ Down'; X = 16; Y = 14; Width = 12; Color = 'White'; KeyCode = 'KEYCODE_DPAD_DOWN' }
-    
+
     # Navigation
     @{ Id = 'HOME'; Label = '⌂ Home'; X = 2; Y = 18; Width = 12; Color = 'Cyan'; KeyCode = 'KEYCODE_HOME' }
     @{ Id = 'BACK'; Label = '← Back'; X = 16; Y = 18; Width = 12; Color = 'Cyan'; KeyCode = 'KEYCODE_BACK' }
     @{ Id = 'OPTIONS'; Label = '⋮ Options'; X = 30; Y = 18; Width = 12; Color = 'Cyan'; KeyCode = 'KEYCODE_MENU' }
-    
+
     # Volume
     @{ Id = 'VOL_UP'; Label = '+ Vol Up'; X = 2; Y = 22; Width = 12; Color = 'Magenta'; KeyCode = 'KEYCODE_VOLUME_UP' }
     @{ Id = 'VOL_DN'; Label = '- Vol Dn'; X = 2; Y = 25; Width = 12; Color = 'Magenta'; KeyCode = 'KEYCODE_VOLUME_DOWN' }
     @{ Id = 'MUTE'; Label = '🔇 Mute'; X = 16; Y = 22; Width = 12; Color = 'Magenta'; KeyCode = 'KEYCODE_VOLUME_MUTE' }
-    
+
     # Channel
     @{ Id = 'CH_UP'; Label = '▲ CH Up'; X = 30; Y = 22; Width = 12; Color = 'Yellow'; KeyCode = 'KEYCODE_CHANNEL_UP' }
     @{ Id = 'CH_DN'; Label = '▼ CH Dn'; X = 30; Y = 25; Width = 12; Color = 'Yellow'; KeyCode = 'KEYCODE_CHANNEL_DOWN' }
-    
+
     # Playback
     @{ Id = 'PLAY'; Label = '▶ Play'; X = 2; Y = 29; Width = 8; Color = 'Green'; KeyCode = 'KEYCODE_MEDIA_PLAY_PAUSE' }
     @{ Id = 'STOP'; Label = '■ Stop'; X = 12; Y = 29; Width = 8; Color = 'Red'; KeyCode = 'KEYCODE_MEDIA_STOP' }
@@ -151,23 +151,23 @@ function Start-RemoteControl {
         Write-Host "Install Android platform-tools and add to PATH" -ForegroundColor Yellow
         return
     }
-    
+
     # Check connection
     if ($Serial) {
         Write-Host "Connecting to $Serial..." -ForegroundColor Cyan
         & adb connect $Serial 2>&1 | Out-Null
     }
-    
+
     $devices = & adb devices | Select-String -Pattern '\w+\s+device$'
     if (-not $devices) {
         Write-Host "Error: No ADB devices connected" -ForegroundColor Red
         Write-Host "Connect with: adb connect <tv-ip>:5555" -ForegroundColor Yellow
         return
     }
-    
+
     $selectedButton = 0
     Show-Remote -HighlightedButton $script:Buttons[$selectedButton].Id
-    
+
     # Enable mouse input if available (Windows only)
     if ($PSVersionTable.Platform -eq 'Win32NT' -or [string]::IsNullOrEmpty($PSVersionTable.Platform)) {
         try {
@@ -177,21 +177,21 @@ function Start-RemoteControl {
             Write-Host "Mouse support not available on this platform" -ForegroundColor DarkGray
         }
     }
-    
+
     while ($true) {
         if ([Console]::KeyAvailable) {
             $key = [Console]::ReadKey($true)
-            
+
             switch ($key.Key) {
-                'Q' { 
+                'Q' {
                     [Console]::Clear()
                     [Console]::CursorVisible = $true
-                    return 
+                    return
                 }
-                'Escape' { 
+                'Escape' {
                     [Console]::Clear()
                     [Console]::CursorVisible = $true
-                    return 
+                    return
                 }
                 'UpArrow' {
                     $selectedButton = ($selectedButton - 1 + $script:Buttons.Count) % $script:Buttons.Count
@@ -238,7 +238,7 @@ function Start-RemoteControl {
                 'Spacebar' { Send-RemoteKey -KeyCode 'KEYCODE_MEDIA_PLAY_PAUSE'; Show-Remote }
             }
         }
-        
+
         Start-Sleep -Milliseconds 50
     }
 }

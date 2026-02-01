@@ -77,7 +77,7 @@ Get-ChildItem $distPath -Filter "*.zip" | ForEach-Object {
     $sizeKB = [math]::Round($_.Length / 1KB, 2)
     $sizeMB = [math]::Round($_.Length / 1MB, 2)
     $sizeStr = if ($sizeMB -gt 1) { "$sizeMB MB" } else { "$sizeKB KB" }
-    
+
     Write-Host "  $($_.Name)" -ForegroundColor White
     Write-Host "    Size: $sizeStr" -ForegroundColor Gray
 }
