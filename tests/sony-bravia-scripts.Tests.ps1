@@ -16,32 +16,46 @@
 #>
 
 BeforeAll {
-    # Import the script under test (one level up from tests folder)
+    # Import the script under test
     $script:ScriptPath = Join-Path $PSScriptRoot '..' 'sony-bravia-scripts.ps1'
 
-    # Mock adb command globally to prevent actual execution
-    Mock -CommandName 'Get-Command' -MockWith {
-        return [PSCustomObject]@{
-            Name        = 'adb'
-            CommandType = 'Application'
-        }
-    } -ParameterFilter { $Name -eq 'adb' }
+    # Verify script exists
+    if (-not (Test-Path $script:ScriptPath)) {
+        throw "Script not found at: $script:ScriptPath"
+    }
 
-    # Create a test module from the script
+    # Mock external commands to prevent actual execution during tests
+    function global:adb {
+        param([Parameter(ValueFromRemainingArguments)]$Args)
+        # Return mock output that looks like successful adb command
+        Write-Output "mock-device`tdevice"
+        $LASTEXITCODE = 0
+    }
+
+    # Read the script content
     $scriptContent = Get-Content $script:ScriptPath -Raw
 
-    # Extract functions for testing (remove param block and try/catch wrapper)
-    $functionsOnly = $scriptContent -replace '(?ms)^.*?(?=function Test-AdbAvailable)', '' `
-        -replace '(?ms)^(try\s*\{.*?)(?=\}\s*catch)', '$1'
-
-    # Create temporary module
-    $script:TestModule = New-Module -ScriptBlock ([scriptblock]::Create($functionsOnly)) -Name 'SonyBraviaScripts'
+    # Extract just the functions and script-level variables, removing the param block and main execution
+    # Find where functions start (after param and Set-StrictMode)
+    $functionsStartPattern = '(?ms)(?<=\$ErrorActionPreference\s*=\s*[''"]Stop[''"]).*?(?=try\s*\{\s*# Initialize configuration)'
+    if ($scriptContent -match $functionsStartPattern) {
+        $functionsAndVars = $Matches[0]
+        # Execute to define all functions and variables
+        try {
+            Invoke-Expression $functionsAndVars
+        }
+        catch {
+            Write-Warning "Some functions failed to load: $_"
+        }
+    }
+    else {
+        Write-Warning "Could not extract functions from script. Tests may fail."
+    }
 }
 
 AfterAll {
-    if ($script:TestModule) {
-        Remove-Module -Name 'SonyBraviaScripts' -Force -ErrorAction SilentlyContinue
-    }
+    # Cleanup
+    Remove-Item Function:\adb -ErrorAction SilentlyContinue
 }
 
 Describe 'Script Structure' {
