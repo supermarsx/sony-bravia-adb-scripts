@@ -739,14 +739,6 @@ If you find this project useful, please consider giving it a star! It helps othe
 
 <div align="center">
 
-**Made with ❤️ for Sony Bravia TV enthusiasts**
+**Made with 🤖 and tears**
 
 [⬆ Back to Top](#sony-bravia-adb-scripts)
-
-</div>
-│       └── ci.yml                     # CI/CD pipeline
-├── .shellcheckrc                      # Shell linting config
-├── .editorconfig                      # Formatting rules
-├── readme.md                          # This file
-└── license.md                         # License information
-```
