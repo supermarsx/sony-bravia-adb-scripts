@@ -1531,7 +1531,7 @@ $script:Menu = @(
     @('H1', 'Density: current', 'h1'), @('H2', 'Density: set custom', 'h2'), @('H3', 'Density: set 260', 'h3'), @('H4', 'Density: reset', 'h4'),
     @('H5', 'Resolution: current', 'h5'), @('H6', 'Resolution: set custom', 'h6'), @('H7', 'Resolution: reset', 'h7'),
     @('H8', 'Animations: current', 'h8'), @('H9', 'Animations: set custom', 'h9'), @('H10', 'Animations: set 0.2x', 'h10'), @('H11', 'Animations: reset', 'h11'),
-    @('I1', 'Apps: list all', 'i1'), @('I2', 'Apps: clear caches (trim)', 'i2'), @('I3', 'Apps: reset permissions', 'i3'),
+    @('I1', 'Apps: list all', 'i1'), @('I2', 'Apps: clear caches (trim)', 'i2'), @('I2A', 'Apps: clear cache all (loop)', 'i3a'), @('I3', 'Apps: reset permissions', 'i3'),
     @('I4', 'Apps: disable (debloat)', 'i4'), @('I5', 'Apps: enable (reverse)', 'i5'),
     @('I6', 'Apps: install', 'i6'), @('I7', 'Apps: install multi package', 'i7'),
     @('I8', 'Apps: enable', 'i8'), @('I9', 'Apps: disable', 'i9'),
