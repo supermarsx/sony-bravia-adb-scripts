@@ -96,26 +96,26 @@ Describe 'Helper Functions' {
     Context 'Test-AdbAvailable' {
         It 'should not throw when adb is available' {
             Mock -CommandName 'Get-Command' -MockWith {
-                return [PSCustomObject]@{ Name = 'adb' }
-            } -ModuleName 'SonyBraviaScripts'
+                return [PSCustomObject]@{ Name = 'adb'; Path = 'adb' }
+            }
 
-            { & $script:TestModule { Test-AdbAvailable } } | Should -Not -Throw
+            { Test-AdbAvailable } | Should -Not -Throw
         }
 
         It 'should throw when adb is not available' {
             Mock -CommandName 'Get-Command' -MockWith {
                 return $null
-            } -ModuleName 'SonyBraviaScripts'
+            }
 
-            { & $script:TestModule { Test-AdbAvailable } } | Should -Throw '*adb was not found*'
+            { Test-AdbAvailable } | Should -Throw '*adb was not found*'
         }
     }
 
     Context 'Read-NonEmpty' {
         It 'should return non-empty input' {
-            Mock -CommandName 'Read-Host' -MockWith { 'test-input' } -ModuleName 'SonyBraviaScripts'
+            Mock -CommandName 'Read-Host' -MockWith { 'test-input' }
 
-            $result = & $script:TestModule { Read-NonEmpty -Prompt 'Test' }
+            $result = Read-NonEmpty -Prompt 'Test'
             $result | Should -Be 'test-input'
         }
 
@@ -126,39 +126,39 @@ Describe 'Helper Functions' {
                 if ($script:callCount -eq 1) { return '' }
                 if ($script:callCount -eq 2) { return '   ' }
                 return 'valid'
-            } -ModuleName 'SonyBraviaScripts'
+            }
 
-            $result = & $script:TestModule { Read-NonEmpty -Prompt 'Test' }
+            $result = Read-NonEmpty -Prompt 'Test'
             $result | Should -Be 'valid'
         }
     }
 
     Context 'Read-YesNo' {
         It 'should return true for "y"' {
-            Mock -CommandName 'Read-Host' -MockWith { 'y' } -ModuleName 'SonyBraviaScripts'
+            Mock -CommandName 'Read-Host' -MockWith { 'y' }
 
-            $result = & $script:TestModule { Read-YesNo -Prompt 'Test' }
+            $result = Read-YesNo -Prompt 'Test'
             $result | Should -Be $true
         }
 
         It 'should return true for "yes"' {
-            Mock -CommandName 'Read-Host' -MockWith { 'YES' } -ModuleName 'SonyBraviaScripts'
+            Mock -CommandName 'Read-Host' -MockWith { 'YES' }
 
-            $result = & $script:TestModule { Read-YesNo -Prompt 'Test' }
+            $result = Read-YesNo -Prompt 'Test'
             $result | Should -Be $true
         }
 
         It 'should return false for "n"' {
-            Mock -CommandName 'Read-Host' -MockWith { 'n' } -ModuleName 'SonyBraviaScripts'
+            Mock -CommandName 'Read-Host' -MockWith { 'n' }
 
-            $result = & $script:TestModule { Read-YesNo -Prompt 'Test' }
+            $result = Read-YesNo -Prompt 'Test'
             $result | Should -Be $false
         }
 
         It 'should return false for "no"' {
-            Mock -CommandName 'Read-Host' -MockWith { 'NO' } -ModuleName 'SonyBraviaScripts'
+            Mock -CommandName 'Read-Host' -MockWith { 'NO' }
 
-            $result = & $script:TestModule { Read-YesNo -Prompt 'Test' }
+            $result = Read-YesNo -Prompt 'Test'
             $result | Should -Be $false
         }
 
@@ -168,9 +168,9 @@ Describe 'Helper Functions' {
                 $script:callCount++
                 if ($script:callCount -eq 1) { return 'maybe' }
                 return 'yes'
-            } -ModuleName 'SonyBraviaScripts'
+            }
 
-            $result = & $script:TestModule { Read-YesNo -Prompt 'Test' }
+            $result = Read-YesNo -Prompt 'Test'
             $result | Should -Be $true
         }
     }
@@ -178,51 +178,54 @@ Describe 'Helper Functions' {
 
 Describe 'Invoke-Adb Function' {
     BeforeEach {
-        Mock -CommandName 'Write-Host' -MockWith {} -ModuleName 'SonyBraviaScripts'
-        Mock -CommandName 'Test-AdbAvailable' -MockWith {} -ModuleName 'SonyBraviaScripts'
+        Mock -CommandName 'Write-Host' -MockWith {}
+        Mock -CommandName 'Test-AdbAvailable' -MockWith {}
+        Mock -CommandName 'Get-Config' -MockWith {
+            return [PSCustomObject]@{
+                retryAttempts = 3
+                retryDelayMs  = 100
+            }
+        }
+        $script:Serial = $null
+        $script:QuietMode = $true
     }
 
     It 'should call adb with provided arguments' {
         Mock -CommandName 'adb' -MockWith {
-            return 'success'
-        } -ModuleName 'SonyBraviaScripts'
-        Mock -CommandName '&' -MockWith {
-            param($cmd, $args)
             $global:LASTEXITCODE = 0
             return 'success'
         }
 
-        & $script:TestModule {
-            param($Serial)
-            $Serial = $null
-            Invoke-Adb -Args @('devices')
-        }
-
-        Should -Invoke -CommandName 'Test-AdbAvailable' -ModuleName 'SonyBraviaScripts' -Times 1
+        $result = Invoke-Adb -Args @('devices')
+        
+        Should -Invoke -CommandName 'Test-AdbAvailable' -Times 1
+        Should -Invoke -CommandName 'adb' -Times 1
+        $result.Success | Should -Be $true
     }
 
     It 'should include serial when provided' {
         $script:Serial = '192.168.1.100:5555'
 
         Mock -CommandName 'adb' -MockWith {
-            param($s, $serial, $cmd)
-            $s | Should -Be '-s'
-            $serial | Should -Be '192.168.1.100:5555'
+            param([Parameter(ValueFromRemainingArguments)]$args)
+            $global:LASTEXITCODE = 0
+            # Verify -s and serial are in the args
+            $args[0] | Should -Be '-s'
+            $args[1] | Should -Be '192.168.1.100:5555'
             return 'success'
         }
 
-        # This test validates serial is passed correctly
-        # Full integration test would require more complex mocking
+        $result = Invoke-Adb -Args @('devices')
+        $result.Success | Should -Be $true
     }
 
     It 'should throw on non-zero exit code by default' {
-        Mock -CommandName '&' -MockWith {
+        Mock -CommandName 'adb' -MockWith {
             $global:LASTEXITCODE = 1
-            return 'error'
+            return 'error output'
         }
 
-        # Test would need proper execution context
-        # Validated by integration tests
+        { Invoke-Adb -Args @('devices') } | Should -Throw
     }
 }
 

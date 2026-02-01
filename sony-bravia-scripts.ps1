@@ -394,7 +394,7 @@ function Done {
     Write-Host ""
     Write-Host "Finished executing." -ForegroundColor Green
     Write-Host ""
-    Pause-Continue
+    Wait-ForContinue
 }
 
 function NotImplemented {
