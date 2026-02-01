@@ -1,0 +1,57 @@
+PackageIdentifier: YourPublisher.SonyBraviaScripts
+PackageVersion: 2.0.0.0
+PackageName: Sony Bravia ADB Scripts
+Publisher: Your Name
+License: MIT
+LicenseUrl: https://github.com/yourusername/sony-bravia-adb-scripts/blob/main/license.md
+ShortDescription: Sony Bravia TV ADB control scripts with 70+ actions
+Description: |-
+  Sony Bravia ADB Scripts provides comprehensive control over Sony Bravia Android TVs
+  using the Android Debug Bridge (ADB). Features include:
+  
+  - 70+ TV control actions (navigation, media, apps, settings)
+  - Interactive TUI menu system
+  - CLI mode with action codes
+  - Batch execution (comma-separated or file-based)
+  - Configuration file support
+  - Command history tracking
+  - Multiple output formats (Text, JSON, CSV)
+  - Connection validation with retry logic
+  - Cross-platform (Windows, macOS, Linux)
+  
+  Requirements:
+  - PowerShell 7+ (cross-platform)
+  - ADB (Android Debug Bridge)
+  - Sony Bravia TV with USB debugging enabled
+PackageUrl: https://github.com/yourusername/sony-bravia-adb-scripts
+Tags:
+  - sony
+  - bravia
+  - adb
+  - tv
+  - remote-control
+  - android-tv
+  - automation
+  - powershell
+Moniker: sony-bravia
+ReleaseNotesUrl: https://github.com/yourusername/sony-bravia-adb-scripts/releases/tag/rolling
+Installers:
+  - Architecture: x64
+    InstallerType: zip
+    InstallerUrl: https://github.com/yourusername/sony-bravia-adb-scripts/releases/download/rolling/sony-bravia-scripts-powershell.zip
+    InstallerSha256: ROLLING_RELEASE_SHA256
+    NestedInstallerType: portable
+    NestedInstallerFiles:
+      - RelativeFilePath: sony-bravia-scripts.ps1
+        PortableCommandAlias: sony-bravia-scripts
+      - RelativeFilePath: sony-bravia-scripts.cmd
+        PortableCommandAlias: sony-bravia
+    Commands:
+      - sony-bravia-scripts
+      - sony-bravia
+    Dependencies:
+      ExternalDependencies:
+        - PowerShell 7+
+        - ADB (Android Platform Tools)
+ManifestType: singleton
+ManifestVersion: 1.6.0
