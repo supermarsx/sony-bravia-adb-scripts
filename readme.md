@@ -42,10 +42,14 @@
 ## ✨ Features
 
 ### 🎮 Navigation & Control
-- Complete remote control emulation (D-pad, Home, Back, Menu)
-- Volume, channel, and playback controls
-- Quick input switching and HDMI-CEC commands
-- Picture and sound mode adjustments
+- **NEW: Interactive TUI Remote** - Graphical remote control with mouse support ([sony-bravia-remote.ps1](sony-bravia-remote.ps1))
+- D-pad navigation (Up, Down, Left, Right, OK)
+- Volume controls (Up, Down, Mute)
+- Channel controls (Up, Down)
+- Playback controls (Play/Pause, Stop, Rewind, Fast Forward)
+- Quick navigation (Home, Back, Menu)
+- Power management
+- Input switching and HDMI-CEC commands
 
 ### 📺 TV Management
 - System information retrieval (model, Android version, specs)
@@ -185,6 +189,27 @@ chmod +x sony-bravia-scripts.sh
 
 ## 🚀 Usage
 
+### Interactive Remote Control (NEW!)
+
+Use the graphical TUI remote with mouse support:
+
+```powershell
+# Windows
+.\sony-bravia-remote.ps1
+
+# macOS/Linux
+pwsh -File sony-bravia-remote.ps1
+
+# With specific device
+.\sony-bravia-remote.ps1 -Serial 192.168.1.100:5555
+```
+
+**Features:**
+- 🖱️ **Mouse support** - Click buttons directly (Windows)
+- ⌨️ **Keyboard shortcuts** - Arrow keys, WASD, H (Home), B (Back), Space (Play/Pause)
+- 🎨 **Visual interface** - Beautiful button layout with color coding
+- 🎮 **Full remote** - Power, D-pad, Volume, Channel, Playback controls
+
 ### Interactive Menu (Recommended)
 
 Launch the beautiful terminal UI with keyboard-driven navigation:
@@ -270,12 +295,20 @@ Store connection details and preferences:
 
 ### Quick Reference
 
+#### Interactive Remote ([sony-bravia-remote.ps1](sony-bravia-remote.ps1))
+- **Mouse**: Click any button
+- **Arrow Keys**: Navigate between buttons
+- **Enter**: Activate selected button  
+- **WASD**: D-pad navigation
+- **H**: Home, **B**: Back, **Space**: Play/Pause
+- **Q/Esc**: Quit
+
 #### Navigation Actions (D-Pad)
-- **up, down, left, right**: D-pad navigation
-- **enter**: Select/OK button
-- **back**: Back button
-- **home**: Home screen
-- **menu**: Options menu
+- **KEYCODE_DPAD_UP/DOWN/LEFT/RIGHT**: D-pad navigation
+- **KEYCODE_DPAD_CENTER**: Select/OK button
+- **KEYCODE_BACK**: Back button
+- **KEYCODE_HOME**: Home screen
+- **KEYCODE_MENU**: Options menu
 
 #### Volume & Channel
 - **v+, v-**: Volume up/down
@@ -623,6 +656,7 @@ Before submitting:
 ```
 sony-bravia-adb-scripts/
 ├── 📜 sony-bravia-scripts.ps1       # Main PowerShell script (2200+ lines, 70+ actions)
+├── 🎮 sony-bravia-remote.ps1        # Interactive TUI Remote with mouse support (NEW!)
 ├── 🪟 sony-bravia-scripts.cmd       # Windows launcher
 ├── 🐧 sony-bravia-scripts.sh        # macOS/Linux launcher
 ├── 📦 Package Managers
