@@ -52,7 +52,8 @@ if ($results) {
         Write-Host "✗ PSScriptAnalyzer found $errorCount error(s)" -ForegroundColor Red
         Write-Host ""
         exit 1
-    } elseif ($warningCount -gt 0) {
+    }
+    elseif ($warningCount -gt 0) {
         Write-Host "⚠ PSScriptAnalyzer found $warningCount warning(s)" -ForegroundColor Yellow
         Write-Host ""
         exit 0

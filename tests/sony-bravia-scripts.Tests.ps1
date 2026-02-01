@@ -22,7 +22,7 @@ BeforeAll {
     # Mock adb command globally to prevent actual execution
     Mock -CommandName 'Get-Command' -MockWith {
         return [PSCustomObject]@{
-            Name = 'adb'
+            Name        = 'adb'
             CommandType = 'Application'
         }
     } -ParameterFilter { $Name -eq 'adb' }
@@ -32,7 +32,7 @@ BeforeAll {
     
     # Extract functions for testing (remove param block and try/catch wrapper)
     $functionsOnly = $scriptContent -replace '(?ms)^.*?(?=function Test-AdbAvailable)', '' `
-                                    -replace '(?ms)^(try\s*\{.*?)(?=\}\s*catch)', '$1'
+        -replace '(?ms)^(try\s*\{.*?)(?=\}\s*catch)', '$1'
     
     # Create temporary module
     $script:TestModule = New-Module -ScriptBlock ([scriptblock]::Create($functionsOnly)) -Name 'SonyBraviaScripts'
@@ -266,7 +266,7 @@ Describe 'Action Functions' {
         
         # Extract all action function names
         $script:ActionFunctions = [regex]::Matches($scriptContent, '(?m)^function ([a-z]\d+) \{') |
-            ForEach-Object { $_.Groups[1].Value }
+        ForEach-Object { $_.Groups[1].Value }
     }
 
     It 'should have action functions defined' {
@@ -400,7 +400,7 @@ Describe 'Action Functions' {
         It 'should use Invoke-Adb for ADB commands' {
             # Most functions should use Invoke-Adb
             $adbFunctions = @('a1', 'a2', 'a3', 'b1', 'b2', 'b3', 'c1', 'c2', 'c3', 'c4', 
-                             'd1', 'd2', 'd3', 'd4', 'd5', 'd6', 'd7', 'd8')
+                'd1', 'd2', 'd3', 'd4', 'd5', 'd6', 'd7', 'd8')
             
             $adbFunctions | ForEach-Object {
                 $functionName = $_
@@ -605,7 +605,7 @@ Describe 'Documentation' {
 
     It 'should have multiple examples' {
         ($scriptContent | Select-String -Pattern '\.EXAMPLE' -AllMatches).Matches.Count |
-            Should -BeGreaterOrEqual 2
+        Should -BeGreaterOrEqual 2
     }
 }
 
@@ -796,8 +796,8 @@ Describe 'Action Function Behavior' {
             
             # Functions that need user input
             @('a1', 'c4', 'f4', 'f5', 'f6', 'g3', 'h2', 'h6', 'h9', 'i4', 'i5', 
-              'i6', 'i8', 'i9', 'i10', 'i11', 'i12', 'j2', 'j3', 'j4', 'k2', 
-              'k5', 'l3', 'l4', 'm1') | ForEach-Object {
+                'i6', 'i8', 'i9', 'i10', 'i11', 'i12', 'j2', 'j3', 'j4', 'k2', 
+                'k5', 'l3', 'l4', 'm1') | ForEach-Object {
                 $funcName = $_
                 if ($scriptContent -match "(?ms)function $funcName \{(.*?)(?=^function |\z)") {
                     $body = $Matches[1]

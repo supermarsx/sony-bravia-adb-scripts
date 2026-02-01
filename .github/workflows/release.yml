@@ -3,15 +3,15 @@ name: Release
 on:
   push:
     tags:
-      - 'v*.*.*'
+      - "v*.*.*"
   workflow_dispatch:
     inputs:
       version:
-        description: 'Release version (e.g., v2.0.0)'
+        description: "Release version (e.g., v2.0.0)"
         required: true
         type: string
       prerelease:
-        description: 'Mark as pre-release'
+        description: "Mark as pre-release"
         required: false
         type: boolean
         default: false
@@ -25,13 +25,13 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
       upload_url: ${{ steps.create_release.outputs.upload_url }}
-    
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      
+
       - name: Determine version
         id: version
         run: |
@@ -42,16 +42,16 @@ jobs:
           fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Version: $VERSION"
-      
+
       - name: Generate changelog
         id: changelog
         run: |
           VERSION="${{ steps.version.outputs.version }}"
           PREV_TAG=$(git describe --tags --abbrev=0 "${VERSION}^" 2>/dev/null || echo "")
-          
+
           echo "# Release ${VERSION}" > RELEASE_NOTES.md
           echo "" >> RELEASE_NOTES.md
-          
+
           if [ -n "$PREV_TAG" ]; then
             echo "## Changes since ${PREV_TAG}" >> RELEASE_NOTES.md
             echo "" >> RELEASE_NOTES.md
@@ -61,7 +61,7 @@ jobs:
             echo "" >> RELEASE_NOTES.md
             echo "First version of Sony Bravia ADB Scripts with 70+ TV control actions." >> RELEASE_NOTES.md
           fi
-          
+
           echo "" >> RELEASE_NOTES.md
           echo "## Installation" >> RELEASE_NOTES.md
           echo "" >> RELEASE_NOTES.md
@@ -105,9 +105,9 @@ jobs:
           echo "- [Troubleshooting](docs/TROUBLESHOOTING.md) - Common issues and solutions" >> RELEASE_NOTES.md
           echo "- [Recipes](docs/RECIPES.md) - Example use cases" >> RELEASE_NOTES.md
           echo "- [FAQ](docs/FAQ.md) - Frequently asked questions" >> RELEASE_NOTES.md
-          
+
           cat RELEASE_NOTES.md
-      
+
       - name: Create Release
         id: create_release
         uses: actions/create-release@v1
@@ -132,11 +132,11 @@ jobs:
             package: unix
           - os: ubuntu-latest
             package: complete
-    
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      
+
       - name: Install PowerShell (Ubuntu)
         if: runner.os == 'Linux'
         run: |
@@ -147,21 +147,21 @@ jobs:
           rm packages-microsoft-prod.deb
           sudo apt-get update
           sudo apt-get install -y powershell
-      
+
       - name: Create package
         shell: pwsh
         run: |
           Write-Host "Creating package: ${{ matrix.package }}"
-          
+
           $outputDir = "release"
           New-Item -ItemType Directory -Force -Path $outputDir | Out-Null
-          
+
           $packageName = "sony-bravia-scripts-${{ matrix.package }}"
           $packagePath = Join-Path $outputDir "$packageName"
-          
+
           # Create package directory
           New-Item -ItemType Directory -Force -Path $packagePath | Out-Null
-          
+
           # Copy files based on package type
           if ("${{ matrix.package }}" -eq "powershell") {
               Copy-Item "sony-bravia-scripts.ps1" -Destination $packagePath
@@ -202,20 +202,20 @@ jobs:
                   Copy-Item "dev" -Destination $packagePath -Recurse
               }
           }
-          
+
           # Create zip
           $zipPath = Join-Path $outputDir "$packageName.zip"
           Compress-Archive -Path $packagePath -DestinationPath $zipPath -Force
-          
+
           Write-Host "Package created: $zipPath"
           Write-Host "Package size: $((Get-Item $zipPath).Length / 1KB) KB"
-      
+
       - name: Upload package artifact
         uses: actions/upload-artifact@v4
         with:
           name: sony-bravia-scripts-${{ matrix.package }}
           path: release/sony-bravia-scripts-${{ matrix.package }}.zip
-      
+
       - name: Upload to release
         uses: actions/upload-release-asset@v1
         env:
@@ -229,11 +229,11 @@ jobs:
   update-release-summary:
     needs: [create-release, build-packages]
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      
+
       - name: Generate package summary
         run: |
           echo "# Release Artifacts" > PACKAGE_SUMMARY.md
@@ -253,23 +253,23 @@ jobs:
           echo "   - macOS/Linux: \`./install.sh\`" >> PACKAGE_SUMMARY.md
           echo "" >> PACKAGE_SUMMARY.md
           echo "For detailed instructions, see the [README](readme.md)." >> PACKAGE_SUMMARY.md
-          
+
           cat PACKAGE_SUMMARY.md
-      
+
       - name: Comment on release
         uses: actions/github-script@v7
         with:
           script: |
             const fs = require('fs');
             const summary = fs.readFileSync('PACKAGE_SUMMARY.md', 'utf8');
-            
+
             const releases = await github.rest.repos.listReleases({
               owner: context.repo.owner,
               repo: context.repo.repo,
             });
-            
+
             const release = releases.data.find(r => r.tag_name === '${{ needs.create-release.outputs.version }}');
-            
+
             if (release) {
               await github.rest.repos.updateRelease({
                 owner: context.repo.owner,

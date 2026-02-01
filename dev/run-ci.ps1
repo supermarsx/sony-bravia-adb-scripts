@@ -59,7 +59,8 @@ function Invoke-Step {
                 return $true
             }
             bash $Script
-        } else {
+        }
+        else {
             # Run PowerShell script
             & $Script
         }
@@ -72,7 +73,8 @@ function Invoke-Step {
         
         if ($exitCode -eq 0) {
             return $true
-        } else {
+        }
+        else {
             $script:failed = $true
             return $false
         }
@@ -105,7 +107,8 @@ if (-not $SkipFormat) {
     if (-not $Fast) {
         $formatSh = Invoke-Step -Name "Format Shell" -Script (Join-Path $devPath "format-shell.sh") -IsShell
     }
-} else {
+}
+else {
     Write-Host "PHASE 1: FORMAT CHECKS - SKIPPED" -ForegroundColor Yellow
 }
 
@@ -120,7 +123,8 @@ if (-not $SkipLint -and -not $failed) {
     if (-not $Fast) {
         $lintSh = Invoke-Step -Name "Lint Shell" -Script (Join-Path $devPath "lint-shell.sh") -IsShell
     }
-} else {
+}
+else {
     if ($SkipLint) {
         Write-Host ""
         Write-Host "PHASE 2: LINT CHECKS - SKIPPED" -ForegroundColor Yellow
@@ -138,7 +142,8 @@ if (-not $SkipTests -and -not $failed) {
     if (-not $Fast) {
         $testSh = Invoke-Step -Name "Test Shell" -Script (Join-Path $devPath "test-shell.sh") -IsShell
     }
-} else {
+}
+else {
     if ($SkipTests) {
         Write-Host ""
         Write-Host "PHASE 3: TESTS - SKIPPED" -ForegroundColor Yellow
@@ -152,11 +157,13 @@ if (-not $SkipPackage -and -not $failed) {
     Write-Host ""
     
     $package = Invoke-Step -Name "Create Packages" -Script (Join-Path $devPath "package.ps1")
-} else {
+}
+else {
     if ($SkipPackage) {
         Write-Host ""
         Write-Host "PHASE 4: PACKAGE - SKIPPED" -ForegroundColor Yellow
-    } elseif ($failed) {
+    }
+    elseif ($failed) {
         Write-Host ""
         Write-Host "PHASE 4: PACKAGE - SKIPPED (previous failures)" -ForegroundColor Red
     }
@@ -177,7 +184,8 @@ if ($failed) {
     Write-Host "  ✗ FAILED - Some checks did not pass" -ForegroundColor Red
     Write-Host ""
     exit 1
-} else {
+}
+else {
     Write-Host "  ✓ SUCCESS - All checks passed!" -ForegroundColor Green
     Write-Host ""
     exit 0

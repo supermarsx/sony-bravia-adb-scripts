@@ -2,20 +2,20 @@ name: CI
 
 on:
   push:
-    branches: [ main, master, develop ]
+    branches: [main, master, develop]
   pull_request:
-    branches: [ main, master, develop ]
+    branches: [main, master, develop]
   workflow_dispatch:
 
 jobs:
   # ============================================================================
   # FORMAT CHECKS (run in parallel)
   # ============================================================================
-  
+
   format-powershell:
     name: Format PowerShell
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -24,9 +24,9 @@ jobs:
         shell: pwsh
         run: |
           Write-Host "=== Checking PowerShell formatting ===" -ForegroundColor Cyan
-          
+
           $issues = @()
-          
+
           # Check for trailing whitespace
           $psFiles = Get-ChildItem -Path . -Filter "*.ps1" -Recurse
           foreach ($file in $psFiles) {
@@ -37,7 +37,7 @@ jobs:
               }
             }
           }
-          
+
           # Check for tabs (should use spaces)
           foreach ($file in $psFiles) {
             $content = Get-Content $file.FullName -Raw
@@ -45,23 +45,23 @@ jobs:
               $issues += "Tab character found in $($file.Name) (use spaces)"
             }
           }
-          
+
           if ($issues.Count -gt 0) {
             $issues | ForEach-Object { Write-Host "✗ $_" -ForegroundColor Red }
             exit 1
           }
-          
+
           Write-Host "✓ PowerShell formatting looks good" -ForegroundColor Green
 
       - name: Check EditorConfig compliance
         uses: editorconfig-checker/action-editorconfig-checker@main
         with:
-          version: '2.7.0'
+          version: "2.7.0"
 
   format-shell:
     name: Format Shell
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -69,30 +69,30 @@ jobs:
       - name: Check shell script formatting
         run: |
           echo "=== Checking shell script formatting ==="
-          
+
           # Check for CRLF line endings (should be LF only)
           if file *.sh 2>/dev/null | grep -q CRLF; then
             echo "✗ Error: CRLF line endings detected in shell scripts"
             exit 1
           fi
-          
+
           # Check for trailing whitespace
           if grep -n '[[:blank:]]$' *.sh 2>/dev/null; then
             echo "✗ Trailing whitespace found in shell scripts"
             exit 1
           fi
-          
+
           # Check for executable bit
           if [ ! -x sony-bravia-scripts.sh ]; then
             echo "⚠ Warning: sony-bravia-scripts.sh should be executable"
           fi
-          
+
           echo "✓ Shell script formatting looks good"
 
       - name: Check batch file line endings
         run: |
           echo "=== Checking Windows batch file line endings ==="
-          
+
           # Windows scripts should have CRLF
           if ! file *.cmd 2>/dev/null | grep -q CRLF; then
             echo "⚠ Warning: Windows batch files should have CRLF line endings"
@@ -107,7 +107,7 @@ jobs:
   lint-powershell:
     name: Lint PowerShell
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -121,9 +121,9 @@ jobs:
         shell: pwsh
         run: |
           Write-Host "=== Running PSScriptAnalyzer ===" -ForegroundColor Cyan
-          
+
           $results = Invoke-ScriptAnalyzer -Path . -Recurse -Settings ./dev/PSScriptAnalyzerSettings.psd1 -ReportSummary
-          
+
           if ($results) {
             $results | Format-Table -AutoSize
             $errorCount = ($results | Where-Object { $_.Severity -eq 'Error' }).Count
@@ -155,7 +155,7 @@ jobs:
   lint-shell:
     name: Lint Shell
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -168,10 +168,10 @@ jobs:
       - name: Run shellcheck
         run: |
           echo "=== Running ShellCheck ===" 
-          
+
           EXIT_CODE=0
           shellcheck -x sony-bravia-scripts.sh || EXIT_CODE=$?
-          
+
           if [ "${EXIT_CODE}" -eq 0 ]; then
             echo "✓ No issues found by ShellCheck"
           else
@@ -190,7 +190,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -204,7 +204,7 @@ jobs:
         shell: pwsh
         run: |
           Write-Host "=== Running Pester Tests on ${{ matrix.os }} ===" -ForegroundColor Cyan
-          
+
           $config = New-PesterConfiguration
           $config.Run.Path = './tests'
           $config.Run.Exit = $true
@@ -213,7 +213,7 @@ jobs:
           $config.TestResult.Enabled = $true
           $config.TestResult.OutputFormat = 'NUnitXml'
           $config.TestResult.OutputPath = 'testResults.xml'
-          
+
           Invoke-Pester -Configuration $config
 
       - name: Upload test results
@@ -237,7 +237,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -258,7 +258,7 @@ jobs:
         run: |
           echo "=== Running Bats Tests on ${{ matrix.os }} ==="
           bats tests/launcher.bats
-          
+
           # Windows launcher tests (may not fully work on Unix but check syntax)
           bats tests/launcher-windows.bats || echo "⚠ Windows launcher tests skipped on Unix"
 
@@ -276,8 +276,16 @@ jobs:
   package:
     name: Package Release
     runs-on: ubuntu-latest
-    needs: [format-powershell, format-shell, lint-powershell, lint-shell, test-powershell, test-shell]
-    
+    needs:
+      [
+        format-powershell,
+        format-shell,
+        lint-powershell,
+        lint-shell,
+        test-powershell,
+        test-shell,
+      ]
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -285,35 +293,35 @@ jobs:
       - name: Create PowerShell package
         run: |
           echo "=== Creating PowerShell package ==="
-          
+
           mkdir -p dist
-          
+
           # Create zip with PowerShell script and Windows launcher
           zip -r dist/sony-bravia-scripts-powershell.zip \
             sony-bravia-scripts.ps1 \
             sony-bravia-scripts.cmd \
             readme.md \
             license.md
-          
+
           echo "✓ PowerShell package created"
 
       - name: Create Shell package
         run: |
           echo "=== Creating Shell package ==="
-          
+
           # Create zip with PowerShell script and Unix launcher
           zip -r dist/sony-bravia-scripts-unix.zip \
             sony-bravia-scripts.ps1 \
             sony-bravia-scripts.sh \
             readme.md \
             license.md
-          
+
           echo "✓ Shell package created"
 
       - name: Create complete package
         run: |
           echo "=== Creating complete package ==="
-          
+
           # Create zip with all files
           zip -r dist/sony-bravia-scripts-complete.zip \
             sony-bravia-scripts.ps1 \
@@ -325,7 +333,7 @@ jobs:
             .shellcheckrc \
             .editorconfig \
             tests/
-          
+
           echo "✓ Complete package created"
 
       - name: Display package info
@@ -370,7 +378,7 @@ jobs:
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
     permissions:
       contents: write
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -391,70 +399,70 @@ jobs:
           COMMIT_MSG=$(git log -1 --pretty=format:"%s")
           COMMIT_AUTHOR=$(git log -1 --pretty=format:"%an")
           COMMIT_DATE=$(git log -1 --pretty=format:"%ci")
-          
+
           echo "short_hash=${SHORT_HASH}" >> $GITHUB_OUTPUT
           echo "commit_msg=${COMMIT_MSG}" >> $GITHUB_OUTPUT
           echo "commit_author=${COMMIT_AUTHOR}" >> $GITHUB_OUTPUT
           echo "commit_date=${COMMIT_DATE}" >> $GITHUB_OUTPUT
-          
+
           # Create release notes
           cat > RELEASE_NOTES.md << EOF
           # Rolling Release - ${SHORT_HASH}
-          
+
           **Automated build from latest commit**
-          
+
           ## Commit Information
-          
+
           - **Hash:** \`${SHORT_HASH}\` (\`${GITHUB_SHA}\`)
           - **Message:** ${COMMIT_MSG}
           - **Author:** ${COMMIT_AUTHOR}
           - **Date:** ${COMMIT_DATE}
           - **Branch:** ${GITHUB_REF_NAME}
-          
+
           ## 📦 Packages
-          
+
           This rolling release includes the latest development build with all CI checks passed.
-          
+
           ### Available Downloads:
-          
+
           - **sony-bravia-scripts-powershell.zip** - Windows package with .cmd launcher
           - **sony-bravia-scripts-unix.zip** - macOS/Linux package with .sh launcher
           - **sony-bravia-scripts-complete.zip** - Complete package with tests and dev tools
-          
+
           ### Installation:
-          
+
           **Windows:**
           \`\`\`powershell
           # Extract sony-bravia-scripts-powershell.zip
           .\install.ps1
           \`\`\`
-          
+
           **macOS/Linux:**
           \`\`\`bash
           # Extract sony-bravia-scripts-unix.zip
           chmod +x install.sh
           ./install.sh
           \`\`\`
-          
+
           ## ⚠️ Rolling Release Notice
-          
+
           This is an automated rolling release that reflects the latest state of the ${GITHUB_REF_NAME} branch.
-          
+
           - ✅ All CI checks have passed
           - 🔄 Updated automatically on every push
           - 🧪 May contain experimental features
           - 📌 For stable releases, use tagged versions
-          
+
           ## Changes Since Last Build
-          
+
           See commit history: [${SHORT_HASH}](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA})
-          
+
           ---
-          
+
           **Build:** [#${GITHUB_RUN_NUMBER}](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})  
           **Built:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')
           EOF
-          
+
           cat RELEASE_NOTES.md
 
       - name: Delete existing rolling release
@@ -512,7 +520,7 @@ jobs:
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
     permissions:
       contents: write
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -525,21 +533,21 @@ jobs:
         run: |
           # Download release assets to calculate hashes
           REPO="${GITHUB_REPOSITORY}"
-          
+
           # Download packages
           curl -L "https://github.com/${REPO}/releases/download/rolling/sony-bravia-scripts-powershell.zip" -o powershell.zip
           curl -L "https://github.com/${REPO}/releases/download/rolling/sony-bravia-scripts-unix.zip" -o unix.zip
-          
+
           # Calculate SHA256
           POWERSHELL_SHA256=$(sha256sum powershell.zip | awk '{print $1}')
           UNIX_SHA256=$(sha256sum unix.zip | awk '{print $1}')
-          
+
           echo "powershell_sha256=${POWERSHELL_SHA256}" >> $GITHUB_OUTPUT
           echo "unix_sha256=${UNIX_SHA256}" >> $GITHUB_OUTPUT
-          
+
           echo "PowerShell package SHA256: ${POWERSHELL_SHA256}"
           echo "Unix package SHA256: ${UNIX_SHA256}"
-          
+
           # Cleanup
           rm powershell.zip unix.zip
 
@@ -548,49 +556,49 @@ jobs:
         run: |
           SHORT_HASH=$(git rev-parse --short HEAD)
           FULL_HASH=$(git rev-parse HEAD)
-          
+
           echo "short_hash=${SHORT_HASH}" >> $GITHUB_OUTPUT
           echo "full_hash=${FULL_HASH}" >> $GITHUB_OUTPUT
 
       - name: Update Homebrew formula
         run: |
           echo "Updating Homebrew formula..."
-          
+
           # Update SHA256 in formula
           sed -i "s/sha256 \".*\"/sha256 \"${{ steps.hashes.outputs.unix_sha256 }}\"/" homebrew/sony-bravia-scripts.rb
-          
+
           # Update version with commit hash
           sed -i "s/version \".*\"/version \"2.0.0-${{ steps.commit_info.outputs.short_hash }}\"/" homebrew/sony-bravia-scripts.rb
-          
+
           echo "✓ Homebrew formula updated"
           cat homebrew/sony-bravia-scripts.rb
 
       - name: Update Scoop manifest
         run: |
           echo "Updating Scoop manifest..."
-          
+
           # Update hash and version in JSON
           jq --arg hash "${{ steps.hashes.outputs.powershell_sha256 }}" \
              --arg version "2.0.0-${{ steps.commit_info.outputs.short_hash }}" \
              '.hash = $hash | .version = $version' \
              scoop/sony-bravia-scripts.json > scoop/sony-bravia-scripts.json.tmp
-          
+
           mv scoop/sony-bravia-scripts.json.tmp scoop/sony-bravia-scripts.json
-          
+
           echo "✓ Scoop manifest updated"
           cat scoop/sony-bravia-scripts.json
 
       - name: Update WinGet manifest
         run: |
           echo "Updating WinGet manifest..."
-          
+
           # Update SHA256 in YAML
           sed -i "s/InstallerSha256: .*/InstallerSha256: ${{ steps.hashes.outputs.powershell_sha256 }}/" winget/sony-bravia-scripts.yaml
-          
+
           # Update version (use commit count for build number)
           COMMIT_COUNT=$(git rev-list --count HEAD)
           sed -i "s/PackageVersion: .*/PackageVersion: 2.0.0.${COMMIT_COUNT}/" winget/sony-bravia-scripts.yaml
-          
+
           echo "✓ WinGet manifest updated"
           cat winget/sony-bravia-scripts.yaml
 
@@ -598,20 +606,20 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          
+
           # Check if there are changes
           if git diff --quiet; then
             echo "No changes to commit"
             exit 0
           fi
-          
+
           # Commit changes
           git add homebrew/ scoop/ winget/
           git commit -m "chore: update package manager recipes for rolling release ${{ steps.commit_info.outputs.short_hash }}"
-          
+
           # Push changes
           git push origin HEAD:${GITHUB_REF#refs/heads/}
-          
+
           echo "✓ Package manager recipes updated and pushed"
 
       - name: Update summary
@@ -645,5 +653,3 @@ jobs:
           echo "# WinGet (Windows)" >> $GITHUB_STEP_SUMMARY
           echo "winget install --manifest winget\\" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-
-

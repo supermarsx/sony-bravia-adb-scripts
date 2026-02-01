@@ -93,11 +93,11 @@ function Initialize-Config {
     
     if (-not (Test-Path $script:ConfigFile)) {
         $defaultConfig = @{
-            version = $script:ScriptVer
-            defaultSerial = $null
-            deviceAliases = @{}
-            retryAttempts = 3
-            retryDelayMs = 1000
+            version                     = $script:ScriptVer
+            defaultSerial               = $null
+            deviceAliases               = @{}
+            retryAttempts               = 3
+            retryDelayMs                = 1000
             checkConnectionBeforeAction = $true
         }
         $defaultConfig | ConvertTo-Json | Set-Content $script:ConfigFile
@@ -146,10 +146,10 @@ function Add-ToHistory {
     
     $entry = @{
         timestamp = (Get-Date).ToString('o')
-        action = $Action
-        serial = $Serial
-        success = $Success
-        error = $ErrorMessage
+        action    = $Action
+        serial    = $Serial
+        success   = $Success
+        error     = $ErrorMessage
     }
     
     $history = @($entry) + $history | Select-Object -First $script:MaxHistoryItems
@@ -721,6 +721,85 @@ function i3 {
     Done
 }
 
+function i3a {
+    Write-Title "Clear cache for all apps (loop)"
+    
+    Write-Host "Fetching installed packages..." -ForegroundColor Yellow
+    $packagesOutput = Invoke-Adb -Args @('shell', 'pm list packages') -AllowFailure
+    
+    if (-not $packagesOutput -or $packagesOutput.ExitCode -ne 0) {
+        Write-Host "Failed to retrieve packages" -ForegroundColor Red
+        Done
+        return
+    }
+    
+    # Parse package names from output (format: "package:com.example.app")
+    $packages = $packagesOutput.Output -split "`n" | Where-Object { $_ -match '^package:' } | ForEach-Object {
+        $_.Replace('package:', '').Trim()
+    } | Where-Object { $_ }
+    
+    if ($packages.Count -eq 0) {
+        Write-Host "No packages found" -ForegroundColor Red
+        Done
+        return
+    }
+    
+    Write-Host "Found $($packages.Count) packages" -ForegroundColor Green
+    Write-Host ""
+    
+    $confirm = Read-YesNo "Clear cache for all $($packages.Count) packages? (may take several minutes)"
+    if (-not $confirm) {
+        Write-Host "Cache clear cancelled" -ForegroundColor Yellow
+        Done
+        return
+    }
+    
+    Write-Host ""
+    Write-Host "Clearing cache for all packages..." -ForegroundColor Yellow
+    Write-Host "(This may take a while, please wait...)" -ForegroundColor Gray
+    Write-Host ""
+    
+    $successCount = 0
+    $failCount = 0
+    $current = 0
+    
+    foreach ($pkg in $packages) {
+        $current++
+        $percentage = [math]::Round(($current / $packages.Count) * 100)
+        
+        # Show progress every 10 packages or always in verbose mode
+        if (($current % 10 -eq 0) -or $current -eq 1 -or $current -eq $packages.Count -or $script:VerboseMode) {
+            Write-Host "[$percentage%] Processing $current/$($packages.Count): $pkg" -ForegroundColor Gray
+        }
+        
+        try {
+            # Use pm clear which properly clears cache and data
+            # With -AllowFailure to not break on system packages that can't be cleared
+            $result = Invoke-Adb -Args @('shell', "pm clear $pkg 2>/dev/null || echo 'skip'") -AllowFailure
+            
+            if ($result.Output -notmatch 'Failed|failed|error') {
+                $successCount++
+            }
+            else {
+                $failCount++
+            }
+        }
+        catch {
+            $failCount++
+        }
+    }
+    
+    Write-Host ""
+    Write-Host "Cache clear complete!" -ForegroundColor Green
+    Write-Host "  Cleared: $successCount packages" -ForegroundColor Green
+    if ($failCount -gt 0) {
+        Write-Host "  Skipped: $failCount packages (system apps or already clear)" -ForegroundColor Yellow
+    }
+    Write-Host ""
+    Write-Host "💡 Tip: Freed cache space may take a moment to reflect in storage" -ForegroundColor Cyan
+    Done
+}
+
 function i4 {
     Write-Title "Disable apps (debloat)"
     $packages = Read-NonEmpty "Package names (comma-separated)"
@@ -826,6 +905,489 @@ function j4 {
     Write-Title "Disable launcher package"
     $pkg = Read-NonEmpty "Launcher package"
     Invoke-Adb -Args @('shell', "pm disable-user --user 0 $pkg") -AllowFailure | Out-Null
+    Done
+}
+
+function i13 {
+    Write-Title "Debloat: Disable Sony bloatware (preset)"
+    
+    $bloatwarePackages = @(
+        'com.gameloft.android.HEP.GloftANHP',
+        'com.google.android.inputmethod.japanese',
+        'com.google.android.play.games',
+        'com.opera.sdk.example',
+        'com.qterics.da.product',
+        'com.sony.dtv.b2b.hotellanguage',
+        'com.sony.dtv.b2b.hotellanguange',
+        'com.sony.dtv.b2b.hotelmenu',
+        'com.sony.dtv.b2b.hotelmode',
+        'com.sony.dtv.bleadvertiseservice',
+        'com.sony.dtv.bravialifehack',
+        'com.sony.dtv.imanual',
+        'com.sony.dtv.interactivetvplatform',
+        'com.sony.dtv.interactivetvutil',
+        'com.sony.dtv.interactivetvutil.output',
+        'com.sony.dtv.interactivetvutil.ppbridge',
+        'com.sony.dtv.irbrecommendation',
+        'com.sony.dtv.netflixmanager',
+        'com.sony.dtv.networkapp.wifidirect',
+        'com.sony.dtv.networkrecommendation',
+        'com.sony.dtv.osat.album',
+        'com.sony.dtv.photosharingplus',
+        'com.sony.dtv.recommendationservice',
+        'com.sony.dtv.shopsettings',
+        'com.sony.dtv.sonyselect',
+        'com.sony.dtv.sonyshelf',
+        'com.sony.dtv.tvx',
+        'com.sony.dtv.tvx.search.s101.tvprograms.cam',
+        'com.sony.dtv.tvx.search.s101.tvprograms.digital',
+        'com.sony.dtv.tvx.search.s101.tvprograms.vt',
+        'com.sony.dtv.tvx.search.s201.netepg',
+        'com.sony.dtv.tvx.search.s301.rec',
+        'com.sony.dtv.tvx.search.s501.psv',
+        'com.sony.dtv.watchtvrecommendation',
+        'com.sony.dtv.woprecommendation',
+        'com.sony.dtv.youview',
+        'com.sony.snei.video.hhvu',
+        'com.sonyericsson.dlna',
+        'com.sonyericsson.dlna.dtcpplayer',
+        'tv.samba.ssm'
+    )
+    
+    $confirm = Read-YesNo "Disable $($bloatwarePackages.Count) bloatware packages? (recommended)"
+    if ($confirm) {
+        Write-Host "Disabling bloatware packages..." -ForegroundColor Yellow
+        $successCount = 0
+        $failCount = 0
+        
+        foreach ($pkg in $bloatwarePackages) {
+            Write-Host "  Disabling: $pkg" -ForegroundColor Gray
+            try {
+                Invoke-Adb -Args @('shell', "pm disable-user --user 0 $pkg") -AllowFailure | Out-Null
+                $successCount++
+            }
+            catch {
+                $failCount++
+            }
+        }
+        
+        Write-Host ""
+        Write-Host "Debloat complete!" -ForegroundColor Green
+        Write-Host "  Disabled: $successCount packages" -ForegroundColor Green
+        if ($failCount -gt 0) {
+            Write-Host "  Failed: $failCount packages (may not be installed)" -ForegroundColor Yellow
+        }
+    }
+    else {
+        Write-Host "Debloat cancelled" -ForegroundColor Yellow
+    }
+    Done
+}
+
+function i14 {
+    Write-Title "Debloat: Re-enable Sony packages (undo)"
+    
+    $bloatwarePackages = @(
+        'com.gameloft.android.HEP.GloftANHP',
+        'com.google.android.inputmethod.japanese',
+        'com.google.android.play.games',
+        'com.opera.sdk.example',
+        'com.qterics.da.product',
+        'com.sony.dtv.b2b.hotellanguage',
+        'com.sony.dtv.b2b.hotellanguange',
+        'com.sony.dtv.b2b.hotelmenu',
+        'com.sony.dtv.b2b.hotelmode',
+        'com.sony.dtv.bleadvertiseservice',
+        'com.sony.dtv.bravialifehack',
+        'com.sony.dtv.imanual',
+        'com.sony.dtv.interactivetvplatform',
+        'com.sony.dtv.interactivetvutil',
+        'com.sony.dtv.interactivetvutil.output',
+        'com.sony.dtv.interactivetvutil.ppbridge',
+        'com.sony.dtv.irbrecommendation',
+        'com.sony.dtv.netflixmanager',
+        'com.sony.dtv.networkapp.wifidirect',
+        'com.sony.dtv.networkrecommendation',
+        'com.sony.dtv.osat.album',
+        'com.sony.dtv.photosharingplus',
+        'com.sony.dtv.recommendationservice',
+        'com.sony.dtv.shopsettings',
+        'com.sony.dtv.sonyselect',
+        'com.sony.dtv.sonyshelf',
+        'com.sony.dtv.tvx',
+        'com.sony.dtv.tvx.search.s101.tvprograms.cam',
+        'com.sony.dtv.tvx.search.s101.tvprograms.digital',
+        'com.sony.dtv.tvx.search.s101.tvprograms.vt',
+        'com.sony.dtv.tvx.search.s201.netepg',
+        'com.sony.dtv.tvx.search.s301.rec',
+        'com.sony.dtv.tvx.search.s501.psv',
+        'com.sony.dtv.watchtvrecommendation',
+        'com.sony.dtv.woprecommendation',
+        'com.sony.dtv.youview',
+        'com.sony.snei.video.hhvu',
+        'com.sonyericsson.dlna',
+        'com.sonyericsson.dlna.dtcpplayer',
+        'tv.samba.ssm'
+    )
+    
+    $confirm = Read-YesNo "Re-enable $($bloatwarePackages.Count) packages?"
+    if ($confirm) {
+        Write-Host "Re-enabling packages..." -ForegroundColor Yellow
+        $successCount = 0
+        $failCount = 0
+        
+        foreach ($pkg in $bloatwarePackages) {
+            Write-Host "  Enabling: $pkg" -ForegroundColor Gray
+            try {
+                Invoke-Adb -Args @('shell', "pm enable $pkg") -AllowFailure | Out-Null
+                Invoke-Adb -Args @('shell', "cmd package install-existing --user 0 $pkg") -AllowFailure | Out-Null
+                $successCount++
+            }
+            catch {
+                $failCount++
+            }
+        }
+        
+        Write-Host ""
+        Write-Host "Re-enable complete!" -ForegroundColor Green
+        Write-Host "  Enabled: $successCount packages" -ForegroundColor Green
+        if ($failCount -gt 0) {
+            Write-Host "  Failed: $failCount packages" -ForegroundColor Yellow
+        }
+    }
+    else {
+        Write-Host "Re-enable cancelled" -ForegroundColor Yellow
+    }
+    Done
+}
+
+function i15 {
+    Write-Title "Debloat: NUCLEAR - Disable all bloatware (aggressive)"
+    
+    $nuclearPackages = @(
+        'pt.dreamia.pandaplus',
+        'com.uei.quicksetsdk.sony',
+        'com.sony.dtv.b2b.noderuntime.normal',
+        'com.google.android.apps.mediashell',
+        'com.google.android.katniss',
+        'com.sony.dtv.hddmgr',
+        'com.android.providers.calendar',
+        'com.sony.dtv.timers',
+        'com.sony.dtv.tvx.search.s101.tvprograms.prefsat',
+        'com.sony.dtv.tvinput.tuner',
+        'android.autoinstalls.config.sony.bravia',
+        'com.sony.dtv.common.base.AccessibilityText',
+        'com.sony.dtv.rcplayer',
+        'com.sony.dtv.usbmsgservice',
+        'com.qterics.da.product',
+        'com.sony.dtv.imanual',
+        'com.sony.dtv.sonyshelf',
+        'com.sony.dtv.rcplayer.service',
+        'com.spotify.tv.android',
+        'com.sony.dtv.browser.webappruntime',
+        'com.android.pacprocessor',
+        'com.sony.dtv.QuickSetupCustomizer',
+        'com.sony.dtv.b2b.noderuntime',
+        'com.sony.dtv.interactivetvplatform',
+        'com.google.android.marvin.talkback',
+        'com.sony.dtv.bleadvertiseservice',
+        'com.sony.dtv.tvx.search.s101.tvprograms.vt',
+        'com.sony.dtv.tvx.search.s301.rec',
+        'com.google.android.speech.pumpkin',
+        'com.sony.dtv.servicemode',
+        'com.sony.dtv.osat.album',
+        'com.sony.dtv.osat.music',
+        'com.android.backupconfirm',
+        'com.sony.dtv.osat.video',
+        'com.sony.dtv.netproxyservice',
+        'com.sony.dtv.webapi.core',
+        'com.sony.dtv.b2b.hotellanguage',
+        'com.sony.dtv.reminderservice',
+        'com.sony.dtv.browser.webappservice',
+        'com.sony.dtv.interactivetvutil.output',
+        'com.sony.dtv.systemupdate',
+        'com.sony.dtv.shopsettings',
+        'com.sony.dtv.hbbtvlauncher',
+        'com.sony.dtv.customersupport',
+        'com.sony.huey.dlna.renderersettings',
+        'com.sony.dtv.privacypolicy',
+        'com.sony.dtv.browser.webappinstaller',
+        'com.amazon.amazonvideo.livingroom',
+        'com.android.sharedstoragebackup',
+        'com.google.android.music',
+        'com.android.printspooler',
+        'com.sony.dtv.seconddispsetting',
+        'com.sony.dtv.b2b.hotelmenu',
+        'com.wbd.stream',
+        'com.sony.dtv.ime.chww',
+        'com.sony.dtv.imeproxy',
+        'com.sony.dtv.enclave.service',
+        'com.sony.dtv.youview',
+        'com.sony.dtv.tvx.search.s101.tvprograms.cam',
+        'com.sony.dtv.countrysetting',
+        'com.sony.dtv.softwarelicense',
+        'com.youview.tv.servicehost',
+        'com.sony.dtv.recommendationservice',
+        'com.google.android.syncadapters.contacts',
+        'com.sony.dtv.quicksetup',
+        'com.sony.dtv.woprecommendation',
+        'com.sony.dtv.tvx.search.s201.netepg',
+        'com.sony.dtv.tvx.search.s101.tvprograms.digital',
+        'com.teamsmart.videomanager.tv',
+        'com.google.android.tts',
+        'com.impresa.opta',
+        'com.google.android.videos',
+        'com.sony.dtv.browser.ceb',
+        'com.sony.dtv.dialservice',
+        'com.sony.dtv.sonyselect',
+        'com.android.proxyhandler',
+        'com.google.android.feedback',
+        'com.google.android.syncadapters.calendar',
+        'com.sony.dtv.b2b.prosettings',
+        'com.sony.dtv.b2b.importexport',
+        'com.sony.dtv.smarthelp',
+        'com.google.android.tv.bugreportsender',
+        'mtktvapi.agent',
+        'com.sony.dtv.netflixmanager',
+        'com.sony.dtv.tvx.search.s501.psv',
+        'com.sony.dtv.tuningconfirmation_dvbs',
+        'com.sony.dtv.tuningconfirmation_dvbt',
+        'com.sony.dtv.touchpad.tutorial',
+        'screnmirroring.com',
+        'ca.dstudio.atvlauncher.pro',
+        'com.sony.dtv.watchtvrecommendation',
+        'com.google.android.leanbacklauncher',
+        'com.google.android.backuptransport',
+        'com.sony.dtv.interactivetvutil',
+        'com.opera.sdk.example',
+        'com.sony.dtv.bravialifehack',
+        'com.sony.dtv.nfcservice',
+        'com.sony.dtv.tvx.search.s101.tvprograms.gensat',
+        'com.android.vpndialogs',
+        'com.sonyericsson.dlna.dtcpplayer',
+        'com.android.wallpaperbackup',
+        'com.sony.dtv.networkrecommendation',
+        'com.sony.dtv.irbrecommendation',
+        'com.sony.dtv.scrums.action',
+        'com.sony.dtv.demomode',
+        'com.google.android.tv.remote.service',
+        'com.google.android.inputmethod.japanese',
+        'com.b_lam.resplash',
+        'com.sony.dtv.tvplayer',
+        'com.amazon.aiv.eu',
+        'com.google.android.play.games',
+        'com.sony.dtv.bivlinfo',
+        'com.sony.dtv.servermgr',
+        'com.android.providers.contacts',
+        'com.android.captiveportallogin',
+        'com.disney.disneyplus',
+        'com.sony.dtv.discovery',
+        'com.sony.huey.dlna.module'
+    )
+    
+    Write-Host ""
+    Write-Host "⚠️  WARNING: NUCLEAR DEBLOAT ⚠️" -ForegroundColor Red
+    Write-Host "This will disable $($nuclearPackages.Count) packages including:" -ForegroundColor Yellow
+    Write-Host "  - System services (tuner, timers, HDD manager)" -ForegroundColor Yellow
+    Write-Host "  - Google services (TTS, sync, backup)" -ForegroundColor Yellow
+    Write-Host "  - Streaming apps (Netflix, Amazon, Disney+, etc.)" -ForegroundColor Yellow
+    Write-Host "  - TV-specific features (EPG, recordings, etc.)" -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "This may break TV functionality! Use with caution." -ForegroundColor Red
+    Write-Host ""
+    
+    $confirm = Read-YesNo "Proceed with NUCLEAR debloat?"
+    if ($confirm) {
+        Write-Host ""
+        Write-Host "Starting nuclear debloat..." -ForegroundColor Yellow
+        $successCount = 0
+        $failCount = 0
+        
+        foreach ($pkg in $nuclearPackages) {
+            Write-Host "  Disabling: $pkg" -ForegroundColor Gray
+            try {
+                Invoke-Adb -Args @('shell', "pm disable-user --user 0 $pkg") -AllowFailure | Out-Null
+                $successCount++
+            }
+            catch {
+                $failCount++
+            }
+        }
+        
+        Write-Host ""
+        Write-Host "Nuclear debloat complete!" -ForegroundColor Green
+        Write-Host "  Disabled: $successCount packages" -ForegroundColor Green
+        if ($failCount -gt 0) {
+            Write-Host "  Failed: $failCount packages (may not be installed)" -ForegroundColor Yellow
+        }
+        Write-Host ""
+        Write-Host "💡 Tip: Reboot TV for changes to take full effect" -ForegroundColor Cyan
+    }
+    else {
+        Write-Host "Nuclear debloat cancelled" -ForegroundColor Yellow
+    }
+    Done
+}
+
+function i16 {
+    Write-Title "Debloat: Re-enable all packages (undo nuclear)"
+    
+    $nuclearPackages = @(
+        'pt.dreamia.pandaplus',
+        'com.uei.quicksetsdk.sony',
+        'com.sony.dtv.b2b.noderuntime.normal',
+        'com.google.android.apps.mediashell',
+        'com.google.android.katniss',
+        'com.sony.dtv.hddmgr',
+        'com.android.providers.calendar',
+        'com.sony.dtv.timers',
+        'com.sony.dtv.tvx.search.s101.tvprograms.prefsat',
+        'com.sony.dtv.tvinput.tuner',
+        'android.autoinstalls.config.sony.bravia',
+        'com.sony.dtv.common.base.AccessibilityText',
+        'com.sony.dtv.rcplayer',
+        'com.sony.dtv.usbmsgservice',
+        'com.qterics.da.product',
+        'com.sony.dtv.imanual',
+        'com.sony.dtv.sonyshelf',
+        'com.sony.dtv.rcplayer.service',
+        'com.spotify.tv.android',
+        'com.sony.dtv.browser.webappruntime',
+        'com.android.pacprocessor',
+        'com.sony.dtv.QuickSetupCustomizer',
+        'com.sony.dtv.b2b.noderuntime',
+        'com.sony.dtv.interactivetvplatform',
+        'com.google.android.marvin.talkback',
+        'com.sony.dtv.bleadvertiseservice',
+        'com.sony.dtv.tvx.search.s101.tvprograms.vt',
+        'com.sony.dtv.tvx.search.s301.rec',
+        'com.google.android.speech.pumpkin',
+        'com.sony.dtv.servicemode',
+        'com.sony.dtv.osat.album',
+        'com.sony.dtv.osat.music',
+        'com.android.backupconfirm',
+        'com.sony.dtv.osat.video',
+        'com.sony.dtv.netproxyservice',
+        'com.sony.dtv.webapi.core',
+        'com.sony.dtv.b2b.hotellanguage',
+        'com.sony.dtv.reminderservice',
+        'com.sony.dtv.browser.webappservice',
+        'com.sony.dtv.interactivetvutil.output',
+        'com.sony.dtv.systemupdate',
+        'com.sony.dtv.shopsettings',
+        'com.sony.dtv.hbbtvlauncher',
+        'com.sony.dtv.customersupport',
+        'com.sony.huey.dlna.renderersettings',
+        'com.sony.dtv.privacypolicy',
+        'com.sony.dtv.browser.webappinstaller',
+        'com.amazon.amazonvideo.livingroom',
+        'com.android.sharedstoragebackup',
+        'com.google.android.music',
+        'com.android.printspooler',
+        'com.sony.dtv.seconddispsetting',
+        'com.sony.dtv.b2b.hotelmenu',
+        'com.wbd.stream',
+        'com.sony.dtv.ime.chww',
+        'com.sony.dtv.imeproxy',
+        'com.sony.dtv.enclave.service',
+        'com.sony.dtv.youview',
+        'com.sony.dtv.tvx.search.s101.tvprograms.cam',
+        'com.sony.dtv.countrysetting',
+        'com.sony.dtv.softwarelicense',
+        'com.youview.tv.servicehost',
+        'com.sony.dtv.recommendationservice',
+        'com.google.android.syncadapters.contacts',
+        'com.sony.dtv.quicksetup',
+        'com.sony.dtv.woprecommendation',
+        'com.sony.dtv.tvx.search.s201.netepg',
+        'com.sony.dtv.tvx.search.s101.tvprograms.digital',
+        'com.teamsmart.videomanager.tv',
+        'com.google.android.tts',
+        'com.impresa.opta',
+        'com.google.android.videos',
+        'com.sony.dtv.browser.ceb',
+        'com.sony.dtv.dialservice',
+        'com.sony.dtv.sonyselect',
+        'com.android.proxyhandler',
+        'com.google.android.feedback',
+        'com.google.android.syncadapters.calendar',
+        'com.sony.dtv.b2b.prosettings',
+        'com.sony.dtv.b2b.importexport',
+        'com.sony.dtv.smarthelp',
+        'com.google.android.tv.bugreportsender',
+        'mtktvapi.agent',
+        'com.sony.dtv.netflixmanager',
+        'com.sony.dtv.tvx.search.s501.psv',
+        'com.sony.dtv.tuningconfirmation_dvbs',
+        'com.sony.dtv.tuningconfirmation_dvbt',
+        'com.sony.dtv.touchpad.tutorial',
+        'screnmirroring.com',
+        'ca.dstudio.atvlauncher.pro',
+        'com.sony.dtv.watchtvrecommendation',
+        'com.google.android.leanbacklauncher',
+        'com.google.android.backuptransport',
+        'com.sony.dtv.interactivetvutil',
+        'com.opera.sdk.example',
+        'com.sony.dtv.bravialifehack',
+        'com.sony.dtv.nfcservice',
+        'com.sony.dtv.tvx.search.s101.tvprograms.gensat',
+        'com.android.vpndialogs',
+        'com.sonyericsson.dlna.dtcpplayer',
+        'com.android.wallpaperbackup',
+        'com.sony.dtv.networkrecommendation',
+        'com.sony.dtv.irbrecommendation',
+        'com.sony.dtv.scrums.action',
+        'com.sony.dtv.demomode',
+        'com.google.android.tv.remote.service',
+        'com.google.android.inputmethod.japanese',
+        'com.b_lam.resplash',
+        'com.sony.dtv.tvplayer',
+        'com.amazon.aiv.eu',
+        'com.google.android.play.games',
+        'com.sony.dtv.bivlinfo',
+        'com.sony.dtv.servermgr',
+        'com.android.providers.contacts',
+        'com.android.captiveportallogin',
+        'com.disney.disneyplus',
+        'com.sony.dtv.discovery',
+        'com.sony.huey.dlna.module'
+    )
+    
+    Write-Host ""
+    Write-Host "This will re-enable $($nuclearPackages.Count) packages" -ForegroundColor Yellow
+    Write-Host ""
+    
+    $confirm = Read-YesNo "Re-enable all packages?"
+    if ($confirm) {
+        Write-Host ""
+        Write-Host "Re-enabling packages..." -ForegroundColor Yellow
+        $successCount = 0
+        $failCount = 0
+        
+        foreach ($pkg in $nuclearPackages) {
+            Write-Host "  Enabling: $pkg" -ForegroundColor Gray
+            try {
+                Invoke-Adb -Args @('shell', "pm enable $pkg") -AllowFailure | Out-Null
+                Invoke-Adb -Args @('shell', "cmd package install-existing --user 0 $pkg") -AllowFailure | Out-Null
+                $successCount++
+            }
+            catch {
+                $failCount++
+            }
+        }
+        
+        Write-Host ""
+        Write-Host "Re-enable complete!" -ForegroundColor Green
+        Write-Host "  Enabled: $successCount packages" -ForegroundColor Green
+        if ($failCount -gt 0) {
+            Write-Host "  Failed: $failCount packages" -ForegroundColor Yellow
+        }
+        Write-Host ""
+        Write-Host "💡 Tip: Reboot TV for changes to take full effect" -ForegroundColor Cyan
+    }
+    else {
+        Write-Host "Re-enable cancelled" -ForegroundColor Yellow
+    }
     Done
 }
 
@@ -974,6 +1536,8 @@ $script:Menu = @(
     @('I6', 'Apps: install', 'i6'), @('I7', 'Apps: install multi package', 'i7'),
     @('I8', 'Apps: enable', 'i8'), @('I9', 'Apps: disable', 'i9'),
     @('I10', 'Apps: uninstall', 'i10'), @('I11', 'Apps: force stop', 'i11'), @('I12', 'Apps: restart', 'i12'),
+    @('I13', 'Apps: debloat Sony (preset)', 'i13'), @('I14', 'Apps: re-enable Sony (undo)', 'i14'),
+    @('I15', 'Apps: debloat NUCLEAR ⚠️', 'i15'), @('I16', 'Apps: re-enable all (undo nuclear)', 'i16'),
     @('J1', 'Launcher: get current', 'j1'), @('J2', 'Launcher: set custom', 'j2'), @('J3', 'Launcher: enable', 'j3'), @('J4', 'Launcher: disable', 'j4'),
     @('K1', 'Proxy: get current', 'k1'), @('K2', 'Proxy: set custom', 'k2'), @('K3', 'Proxy: reset', 'k3'),
     @('K4', 'Proxy: get exclusions', 'k4'), @('K5', 'Proxy: set exclusions', 'k5'), @('K6', 'Proxy: reset exclusions', 'k6'),
@@ -1519,17 +2083,17 @@ try {
                 Write-Log "Executing: $batchAction" -Level Info
                 $result = Invoke-Action -Id $batchAction -Quiet
                 $results += [pscustomobject]@{
-                    Action = $batchAction
+                    Action  = $batchAction
                     Success = $true
-                    Error = $null
+                    Error   = $null
                 }
                 Add-ToHistory -Action $batchAction -Serial $Serial -Success $true -ErrorMessage $null
             }
             catch {
                 $results += [pscustomobject]@{
-                    Action = $batchAction
+                    Action  = $batchAction
                     Success = $false
-                    Error = $_.Exception.Message
+                    Error   = $_.Exception.Message
                 }
                 Add-ToHistory -Action $batchAction -Serial $Serial -Success $false -ErrorMessage $_.Exception.Message
                 Write-Log "Error executing $batchAction : $($_.Exception.Message)" -Level Error
@@ -1539,9 +2103,11 @@ try {
         # Output results
         if ($OutputFormat -eq 'JSON') {
             $results | ConvertTo-Json
-        } elseif ($OutputFormat -eq 'CSV') {
+        }
+        elseif ($OutputFormat -eq 'CSV') {
             $results | ConvertTo-Csv -NoTypeInformation
-        } else {
+        }
+        else {
             Write-Host "`nBatch Summary:" -ForegroundColor Cyan
             $results | Format-Table -AutoSize
         }
@@ -1561,17 +2127,17 @@ try {
                 Write-Log "Executing: $batchAction" -Level Info
                 $result = Invoke-Action -Id $batchAction -Quiet
                 $results += [pscustomobject]@{
-                    Action = $batchAction
+                    Action  = $batchAction
                     Success = $true
-                    Error = $null
+                    Error   = $null
                 }
                 Add-ToHistory -Action $batchAction -Serial $Serial -Success $true -ErrorMessage $null
             }
             catch {
                 $results += [pscustomobject]@{
-                    Action = $batchAction
+                    Action  = $batchAction
                     Success = $false
-                    Error = $_.Exception.Message
+                    Error   = $_.Exception.Message
                 }
                 Add-ToHistory -Action $batchAction -Serial $Serial -Success $false -ErrorMessage $_.Exception.Message
                 Write-Log "Error executing $batchAction : $($_.Exception.Message)" -Level Error
@@ -1581,9 +2147,11 @@ try {
         # Output results
         if ($OutputFormat -eq 'JSON') {
             $results | ConvertTo-Json
-        } elseif ($OutputFormat -eq 'CSV') {
+        }
+        elseif ($OutputFormat -eq 'CSV') {
             $results | ConvertTo-Csv -NoTypeInformation
-        } else {
+        }
+        else {
             Write-Host "`nBatch Summary:" -ForegroundColor Cyan
             $results | Format-Table -AutoSize
         }
@@ -1611,11 +2179,12 @@ try {
 catch {
     if ($script:OutputFormat -eq 'JSON') {
         @{
-            success = $false
-            error = $_.Exception.Message
+            success   = $false
+            error     = $_.Exception.Message
             timestamp = (Get-Date).ToString('o')
         } | ConvertTo-Json
-    } else {
+    }
+    else {
         Write-Host "" 
         Write-Host "ERROR: $($_.Exception.Message)" -ForegroundColor Red
         Write-Host "" 

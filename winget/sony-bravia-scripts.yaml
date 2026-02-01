@@ -8,7 +8,7 @@ ShortDescription: Sony Bravia TV ADB control scripts with 70+ actions
 Description: |-
   Sony Bravia ADB Scripts provides comprehensive control over Sony Bravia Android TVs
   using the Android Debug Bridge (ADB). Features include:
-  
+
   - 70+ TV control actions (navigation, media, apps, settings)
   - Interactive TUI menu system
   - CLI mode with action codes
@@ -18,7 +18,7 @@ Description: |-
   - Multiple output formats (Text, JSON, CSV)
   - Connection validation with retry logic
   - Cross-platform (Windows, macOS, Linux)
-  
+
   Requirements:
   - PowerShell 7+ (cross-platform)
   - ADB (Android Debug Bridge)
