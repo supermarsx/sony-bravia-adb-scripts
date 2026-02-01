@@ -31,7 +31,7 @@ setup() {
 
 @test "launcher provides installation instructions" {
     grep -q 'brew install --cask powershell' "${LAUNCHER}"
-    grep -q 'Installing PowerShell on Linux' "${LAUNCHER}"
+    grep -q 'installing-powershell-on-linux' "${LAUNCHER}"
 }
 
 @test "launcher exits with error if PowerShell script not found" {

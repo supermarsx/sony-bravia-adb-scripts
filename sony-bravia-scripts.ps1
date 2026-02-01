@@ -308,7 +308,7 @@ function Invoke-Adb {
                     continue
                 }
 
-                throw "adb exited with code $exit: $errorMsg"
+                throw "adb exited with code ${exit}: $errorMsg"
             }
 
             return [pscustomobject]@{
@@ -2046,6 +2046,11 @@ function Start-Tui {
         [Console]::CursorVisible = $origCursorVisible
         [Console]::TreatControlCAsInput = $origTreatCtrlCAsInput
     }
+}
+
+# Skip script execution if being sourced for testing
+if ($env:PESTER_RUN) {
+    return
 }
 
 try {

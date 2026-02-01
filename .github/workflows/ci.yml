@@ -120,28 +120,7 @@ jobs:
       - name: Run PSScriptAnalyzer
         shell: pwsh
         run: |
-          Write-Host "=== Running PSScriptAnalyzer ===" -ForegroundColor Cyan
-
-          $results = Invoke-ScriptAnalyzer -Path . -Recurse -Settings ./dev/PSScriptAnalyzerSettings.psd1 -ReportSummary
-
-          if ($results) {
-            $results | Format-Table -AutoSize
-            $errorCount = ($results | Where-Object { $_.Severity -eq 'Error' }).Count
-            $warningCount = ($results | Where-Object { $_.Severity -eq 'Warning' }).Count
-
-            Write-Host "`n=== Summary ===" -ForegroundColor Cyan
-            Write-Host "Errors: $errorCount" -ForegroundColor $(if ($errorCount -gt 0) { 'Red' } else { 'Green' })
-            Write-Host "Warnings: $warningCount" -ForegroundColor $(if ($warningCount -gt 0) { 'Yellow' } else { 'Green' })
-
-            if ($errorCount -gt 0) {
-              Write-Error "PSScriptAnalyzer found $errorCount error(s)"
-              exit 1
-            } elseif ($warningCount -gt 0) {
-              Write-Warning "PSScriptAnalyzer found $warningCount warning(s)"
-            }
-          } else {
-            Write-Host "✓ No issues found by PSScriptAnalyzer" -ForegroundColor Green
-          }
+          ./dev/lint-powershell.ps1
 
       - name: Upload analysis results
         uses: actions/upload-artifact@v4
