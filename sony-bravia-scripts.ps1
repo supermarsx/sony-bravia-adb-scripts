@@ -1827,12 +1827,12 @@ function Start-Tui {
     param()
 
     # Keep the cursor invisible for a cleaner UI.
-    $origCursorVisible = [Console]::CursorVisible
+    try { $origCursorVisible = [Console]::CursorVisible } catch { $origCursorVisible = $true }
     $origTreatCtrlCAsInput = [Console]::TreatControlCAsInput
     [Console]::TreatControlCAsInput = $true
 
     try {
-        [Console]::CursorVisible = $false
+        try { [Console]::CursorVisible = $false } catch { }
 
         $filter = ''
         $items = New-TuiModel -Filter $filter
@@ -2044,7 +2044,7 @@ function Start-Tui {
         }
     }
     finally {
-        [Console]::CursorVisible = $origCursorVisible
+        try { [Console]::CursorVisible = $origCursorVisible } catch { }
         [Console]::TreatControlCAsInput = $origTreatCtrlCAsInput
     }
 }
